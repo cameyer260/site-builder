@@ -50,9 +50,9 @@ test("happy path: build walks all six stub stages and records both state files",
   expect(generation?.version).toBe(1);
   expect(generation?.stages.deploy?.status).toBe("completed");
 
-  // init registered the Client; ingest stub wrote its marker
+  // init registered the Client; ingest (notes-only here) wrote its manifest
   expect(readClient(ctx.paths.clientJson)?.name).toBe("Acme Co");
-  expect(existsSync(join(ctx.paths.ingest, ".stub"))).toBe(true);
+  expect(existsSync(join(ctx.paths.ingest, "manifest.json"))).toBe(true);
 });
 
 test("forced failure records failure and keeps prior stages; resume completes", async () => {
@@ -93,9 +93,9 @@ test("resume clears the resumed stage's own output (clear-own-output)", async ()
 
   await resumePipeline(makeCtx("Gamma"));
 
-  // ingest dir was wiped then re-created by the stub
+  // ingest dir was wiped then re-created on resume
   expect(existsSync(join(ctx.paths.ingest, "stale.txt"))).toBe(false);
-  expect(existsSync(join(ctx.paths.ingest, ".stub"))).toBe(true);
+  expect(existsSync(join(ctx.paths.ingest, "manifest.json"))).toBe(true);
   // prior stage (init) untouched: the Client record survives
   expect(readClient(ctx.paths.clientJson)?.name).toBe("Gamma");
 });

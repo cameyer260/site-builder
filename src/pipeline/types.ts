@@ -11,6 +11,8 @@ export interface RunContext {
   paths: ClientPaths;
   /** The active Site Version this run targets. */
   version: number;
+  /** Effective crawl page cap for this run (`--pages` override, else config). */
+  pageCap?: number;
   log: Logger;
   /**
    * Test/dev hook (from `SB_STUB_FAIL`): forces the named stub stage to throw,

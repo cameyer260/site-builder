@@ -56,8 +56,12 @@ export async function buildCommand(args: string[]): Promise<number> {
     );
   }
 
-  if (values.pages !== undefined && !Number.isFinite(Number(values.pages))) {
-    throw new UserError(`--pages expects a number, got "${values.pages}"`);
+  let pageCap: number | undefined;
+  if (values.pages !== undefined) {
+    pageCap = Number(values.pages);
+    if (!Number.isInteger(pageCap) || pageCap <= 0) {
+      throw new UserError(`--pages expects a positive integer, got "${values.pages}"`);
+    }
   }
 
   const config = loadConfigOrThrow();
@@ -70,7 +74,7 @@ export async function buildCommand(args: string[]): Promise<number> {
     );
   }
 
-  const ctx = buildRunContext({ config, name, version: 1, command: "build", inputs });
+  const ctx = buildRunContext({ config, name, version: 1, command: "build", inputs, pageCap });
   ctx.log.step(`building Client "${name}" at ${ctx.paths.dir}`);
 
   const result = await runBuild(ctx);

@@ -1,18 +1,29 @@
-import { join } from "node:path";
+import { runIngest } from "../../ingest/ingest.ts";
+import { readClient } from "../../storage/client.ts";
 import type { Stage } from "../types.ts";
-import { runStub } from "./stub.ts";
 
 /**
- * `ingest` (stub) — will crawl the existing site, capture screenshots, download
- * Assets, and extract documents (Phase 2). Owns the whole `ingest/` dir, which
- * is cleared wholesale on resume.
+ * `ingest` — gathers raw material from every provided Input into `ingest/`
+ * (crawl + screenshots + assets + extracted docs + notes) and writes
+ * `manifest.json`. Pure code, no AI. Reads the Client's Inputs from the
+ * `client.json` written by `init`, so it works identically on resume. Owns the
+ * whole `ingest/` dir, cleared wholesale on resume.
  */
 export const ingestStage: Stage = {
   name: "ingest",
   phase: "context",
   outputs: (ctx) => [ctx.paths.ingest],
   async run(ctx) {
-    runStub(ctx, "ingest", [join(ctx.paths.ingest, ".stub")]);
-    ctx.log.step("ingest: gathered raw inputs (stub)");
+    const client = readClient(ctx.paths.clientJson);
+    if (!client) {
+      throw new Error("ingest: client.json missing — init must run first");
+    }
+    await runIngest({
+      paths: ctx.paths,
+      inputs: client.inputs,
+      config: ctx.config,
+      pageCap: ctx.pageCap ?? ctx.config.pageCap,
+      log: ctx.log,
+    });
   },
 };

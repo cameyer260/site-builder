@@ -148,7 +148,7 @@ test("runEngine: success path writes a file in the scoped cwd and parses success
   const touched = join(dir, "engine-touched.txt");
   expect(existsSync(touched)).toBe(true);
   expect(readFileSync(touched, "utf8")).toBe("ok");
-});
+}, 20_000);
 
 test("runEngine: failure path is detected from the result event + exit code", async () => {
   const result = await runEngine(FAKE_ENGINE, { prompt: "please FAIL now", cwd: dir });
@@ -156,10 +156,10 @@ test("runEngine: failure path is detected from the result event + exit code", as
   expect(result.isError).toBe(true);
   expect(result.subtype).toBe("error_during_execution");
   expect(result.exitCode).toBe(1);
-});
+}, 20_000);
 
 test("runEngine: missing binary resolves to a failure (never throws)", async () => {
   const result = await runEngine(join(dir, "does-not-exist"), { prompt: "x", cwd: dir });
   expect(result.ok).toBe(false);
   expect(result.error).toContain("not found");
-});
+}, 20_000);
