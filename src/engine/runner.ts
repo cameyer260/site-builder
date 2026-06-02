@@ -64,6 +64,8 @@ export interface EngineOptions {
   dangerouslySkipPermissions?: boolean;
   /** Extra/overriding environment variables for the child process. */
   env?: Record<string, string>;
+  /** Environment variables to remove from the child (applied before `env`). */
+  unsetEnv?: string[];
   /** Kill the engine after this many milliseconds. */
   timeoutMs?: number;
   /** Logger to tee a one-line trace of each stream event to. */
@@ -223,10 +225,16 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
   let spawnError: string | undefined;
   let timedOut = false;
 
+  const childEnv: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of opts.unsetEnv ?? []) {
+    delete childEnv[key];
+  }
+  Object.assign(childEnv, opts.env);
+
   return new Promise<EngineResult>((resolve) => {
     const child = spawn(engineBin, args, {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
       signal: opts.signal,
     });
@@ -296,3 +304,10 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
     child.stdin.end();
   });
 }
+
+/**
+ * The shape of `runEngine`, so AI stages can accept an injected runner. Stages
+ * default to the real `runEngine`; tests pass a fake that simulates the model
+ * writing its on-disk artifacts, keeping the pipeline offline and deterministic.
+ */
+export type EngineRunner = (engineBin: string, opts: EngineOptions) => Promise<EngineResult>;

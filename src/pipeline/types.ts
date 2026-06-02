@@ -1,4 +1,5 @@
 import type { Config } from "../config/schema.ts";
+import type { EngineRunner } from "../engine/runner.ts";
 import type { ClientInputs } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import type { Logger } from "../util/log.ts";
@@ -24,6 +25,11 @@ export interface RunContext {
    * to write `client.json`; absent on resume (the record already exists).
    */
   inputs?: ClientInputs;
+  /**
+   * Engine runner for the AI stages. Left unset in production (stages default
+   * to the real `runEngine`); tests inject a fake to stay offline.
+   */
+  engine?: EngineRunner;
 }
 
 export interface Stage {

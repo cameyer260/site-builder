@@ -1,17 +1,36 @@
 import { join } from "node:path";
+import { readManifest } from "../../ingest/manifest.ts";
+import { readClient } from "../../storage/client.ts";
+import { runSynthesize } from "../../synthesize/synthesize.ts";
 import type { Stage } from "../types.ts";
-import { runStub } from "./stub.ts";
 
 /**
- * `synthesize` (stub) — will classify Assets and produce the Client Profile
- * plus Checklist gaps (Phase 3). Owns the whole `context/` dir.
+ * `synthesize` — classifies the captured image Assets and produces the Client
+ * Profile (`profile.md` + `profile.json`) plus the Checklist gaps
+ * (`checklist.md`). Code plus AI (two `claude -p` calls). Reads the `ingest/`
+ * manifest, so it works identically on resume. Owns the whole `context/` dir,
+ * cleared wholesale on resume.
  */
 export const synthesizeStage: Stage = {
   name: "synthesize",
   phase: "context",
   outputs: (ctx) => [ctx.paths.context],
   async run(ctx) {
-    runStub(ctx, "synthesize", [join(ctx.paths.context, ".stub")]);
-    ctx.log.step("synthesize: built Client context (stub)");
+    const client = readClient(ctx.paths.clientJson);
+    if (!client) {
+      throw new Error("synthesize: client.json missing — init must run first");
+    }
+    const manifest = readManifest(join(ctx.paths.ingest, "manifest.json"));
+    if (!manifest) {
+      throw new Error("synthesize: ingest manifest missing — ingest must run first");
+    }
+    await runSynthesize({
+      paths: ctx.paths,
+      config: ctx.config,
+      client,
+      manifest,
+      log: ctx.log,
+      engine: ctx.engine,
+    });
   },
 };

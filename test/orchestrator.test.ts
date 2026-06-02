@@ -3,12 +3,14 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
+import type { EngineRunner } from "../src/engine/runner.ts";
 import { findResumeStage, resumePipeline, runBuild } from "../src/pipeline/orchestrator.ts";
 import type { RunContext } from "../src/pipeline/types.ts";
 import { type ClientInputs, ClientInputsSchema, readClient } from "../src/storage/client.ts";
 import { clientPaths } from "../src/storage/layout.ts";
 import { markFailed, readState, writeState } from "../src/storage/state.ts";
 import { createLogger } from "../src/util/log.ts";
+import { fakeStageEngine } from "./fixtures/fake-stage-engine.ts";
 
 const INPUTS: ClientInputs = ClientInputsSchema.parse({ notes: "a test client" });
 
@@ -22,7 +24,10 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function makeCtx(name: string, opts: { failAt?: string; withInputs?: boolean } = {}): RunContext {
+function makeCtx(
+  name: string,
+  opts: { failAt?: string; withInputs?: boolean; engine?: EngineRunner } = {},
+): RunContext {
   const paths = clientPaths(root, name);
   mkdirSync(paths.dir, { recursive: true });
   return {
@@ -32,6 +37,8 @@ function makeCtx(name: string, opts: { failAt?: string; withInputs?: boolean } =
     log: createLogger({ quiet: true }),
     failAt: opts.failAt,
     inputs: opts.withInputs === false ? undefined : INPUTS,
+    // synthesize is a real AI stage now; inject a fake engine to stay offline.
+    engine: opts.engine ?? fakeStageEngine(),
   };
 }
 
@@ -56,7 +63,10 @@ test("happy path: build walks all six stub stages and records both state files",
 });
 
 test("forced failure records failure and keeps prior stages; resume completes", async () => {
-  const failed = await runBuild(makeCtx("Beta", { failAt: "synthesize" }));
+  // Drive the failure through the engine: the synthesize profile call fails.
+  const failed = await runBuild(
+    makeCtx("Beta", { engine: fakeStageEngine({ failProfile: true }) }),
+  );
   expect(failed.ok).toBe(false);
   expect(failed.failedStage).toBe("synthesize");
 
