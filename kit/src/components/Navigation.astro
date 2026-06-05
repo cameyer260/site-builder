@@ -1,5 +1,5 @@
 ---
-import type { ImageMetadata } from 'astro';
+import type { ImageMetadata } from "astro";
 
 interface NavLink {
   label: string;
@@ -31,8 +31,7 @@ const {
 } = Astro.props;
 
 const pathname = Astro.url.pathname;
-const isActive = (href: string) =>
-  href === "/" ? pathname === "/" : pathname.startsWith(href);
+const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 ---
 
 <header

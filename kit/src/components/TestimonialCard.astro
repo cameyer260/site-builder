@@ -7,13 +7,7 @@ interface Props {
   class?: string;
 }
 
-const {
-  quote,
-  author,
-  role,
-  rating,
-  class: className = "",
-} = Astro.props;
+const { quote, author, role, rating, class: className = "" } = Astro.props;
 
 const stars = rating ? Math.max(0, Math.min(5, Math.round(rating))) : 0;
 ---

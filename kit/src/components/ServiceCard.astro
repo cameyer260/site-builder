@@ -7,13 +7,7 @@ interface Props {
   class?: string;
 }
 
-const {
-  title,
-  description,
-  icon,
-  href,
-  class: className = "",
-} = Astro.props;
+const { title, description, icon, href, class: className = "" } = Astro.props;
 
 const Tag = href ? "a" : "div";
 ---

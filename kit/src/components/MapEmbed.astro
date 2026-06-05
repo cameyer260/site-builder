@@ -5,11 +5,7 @@ interface Props {
   class?: string;
 }
 
-const {
-  src,
-  title = "Location map",
-  class: className = "",
-} = Astro.props;
+const { src, title = "Location map", class: className = "" } = Astro.props;
 ---
 
 <div class={`relative w-full aspect-video rounded-card overflow-hidden bg-ink-100 ${className}`}>

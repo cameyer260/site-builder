@@ -1,5 +1,5 @@
 ---
-import type { ImageMetadata } from 'astro';
+import type { ImageMetadata } from "astro";
 
 interface FooterLink {
   label: string;
@@ -42,7 +42,7 @@ const {
 } = Astro.props;
 
 const year = new Date().getFullYear();
-const copyrightName = siteName.replace(/\.$/, '');
+const copyrightName = siteName.replace(/\.$/, "");
 ---
 
 <footer class={`relative bg-ink-950 text-ink-300 overflow-hidden ${className}`}>

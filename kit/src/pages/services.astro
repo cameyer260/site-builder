@@ -8,49 +8,61 @@ const svg = (paths: string) =>
   `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 
 const icons = {
-  star:    svg('<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'),
-  clock:   svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
-  shield:  svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'),
-  wrench:  svg('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
-  bolt:    svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
-  check:   svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'),
+  star: svg(
+    '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
+  ),
+  clock: svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
+  shield: svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'),
+  wrench: svg(
+    '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  ),
+  bolt: svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+  check: svg(
+    '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  ),
 };
 
 const services = [
   {
     icon: icons.star,
     title: "Service One",
-    description: "A fuller description of your first service. Speak to outcomes, who it's for, and what's included.",
+    description:
+      "A fuller description of your first service. Speak to outcomes, who it's for, and what's included.",
     id: "one",
   },
   {
     icon: icons.clock,
     title: "Service Two",
-    description: "A fuller description of your second service. Mention typical timelines or any included extras.",
+    description:
+      "A fuller description of your second service. Mention typical timelines or any included extras.",
     id: "two",
   },
   {
     icon: icons.shield,
     title: "Service Three",
-    description: "A fuller description of your third service. Address the most common customer concern up front.",
+    description:
+      "A fuller description of your third service. Address the most common customer concern up front.",
     id: "three",
   },
   {
     icon: icons.wrench,
     title: "Service Four",
-    description: "A fuller description of your fourth service. Include relevant guarantees or warranties.",
+    description:
+      "A fuller description of your fourth service. Include relevant guarantees or warranties.",
     id: "four",
   },
   {
     icon: icons.bolt,
     title: "Service Five",
-    description: "A fuller description of your fifth service. Help customers self-select whether this is right for them.",
+    description:
+      "A fuller description of your fifth service. Help customers self-select whether this is right for them.",
     id: "five",
   },
   {
     icon: icons.check,
     title: "Service Six",
-    description: "A fuller description of your sixth service. Close with the call to action that fits best.",
+    description:
+      "A fuller description of your sixth service. Close with the call to action that fits best.",
     id: "six",
   },
 ];
