@@ -1,0 +1,206 @@
+@import "tailwindcss";
+
+/*
+ * Shared design tokens for the Kit. Override any token below by re-declaring
+ * it in src/styles/global.css inside an @theme block. Tailwind v4 reads these
+ * as CSS custom properties and generates utility classes from them
+ * (e.g. --color-brand-500 -> bg-brand-500, text-brand-500, etc.).
+ */
+@theme {
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-100: oklch(0.93 0.04 250);
+  --color-brand-200: oklch(0.86 0.08 250);
+  --color-brand-300: oklch(0.78 0.12 250);
+  --color-brand-400: oklch(0.68 0.16 250);
+  --color-brand-500: oklch(0.58 0.18 250);
+  --color-brand-600: oklch(0.48 0.18 250);
+  --color-brand-700: oklch(0.40 0.16 250);
+  --color-brand-800: oklch(0.32 0.12 250);
+  --color-brand-900: oklch(0.24 0.08 250);
+
+  --color-accent-50:  oklch(0.97 0.03 60);
+  --color-accent-100: oklch(0.93 0.06 60);
+  --color-accent-200: oklch(0.88 0.10 60);
+  --color-accent-300: oklch(0.82 0.14 60);
+  --color-accent-400: oklch(0.77 0.16 60);
+  --color-accent-500: oklch(0.72 0.18 60);
+  --color-accent-600: oklch(0.62 0.18 60);
+  --color-accent-700: oklch(0.52 0.16 60);
+
+  --color-ink-950: oklch(0.12 0.01 250);
+  --color-ink-900: oklch(0.20 0.01 250);
+  --color-ink-800: oklch(0.27 0.01 250);
+  --color-ink-700: oklch(0.35 0.01 250);
+  --color-ink-600: oklch(0.42 0.01 250);
+  --color-ink-500: oklch(0.50 0.01 250);
+  --color-ink-400: oklch(0.62 0.01 250);
+  --color-ink-300: oklch(0.78 0.01 250);
+  --color-ink-200: oklch(0.88 0.008 250);
+  --color-ink-100: oklch(0.95 0.005 250);
+  --color-ink-50:  oklch(0.98 0.003 250);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 0.75rem;
+  --radius-button: 0.5rem;
+
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.06), 0 4px 20px rgb(0 0 0 / 0.10);
+  --shadow-lift: 0 10px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+  --shadow-glow: 0 0 0 1px var(--color-brand-100), 0 8px 30px -8px var(--color-brand-400);
+
+  /* Animation tokens — Tailwind v4 generates `animate-{name}` utilities. */
+  --animate-fade-in: fade-in 0.6s ease-out both;
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-down: fade-down 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-scale-in: scale-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float-slow: float 8s ease-in-out infinite;
+  --animate-float-medium: float 6s ease-in-out infinite;
+  --animate-blob: blob 14s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-bounce-subtle: bounce-subtle 1.8s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 2.5s ease-in-out infinite;
+  --animate-gradient-x: gradient-x 8s ease-in-out infinite;
+  --animate-marquee: marquee 28s linear infinite;
+  --animate-spin-slow: spin 12s linear infinite;
+}
+
+/* Keyframes consumed by the @theme --animate-* tokens above. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translate3d(0, 24px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes fade-down {
+  from { opacity: 0; transform: translate3d(0, -16px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, -14px, 0); }
+}
+@keyframes blob {
+  0%, 100% { transform: translate3d(0,0,0) scale(1); }
+  33%      { transform: translate3d(20px,-30px,0) scale(1.08); }
+  66%      { transform: translate3d(-15px,18px,0) scale(0.95); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--color-brand-400, rgb(59 130 246 / 0.45)); opacity: 1; }
+  50%      { box-shadow: 0 0 0 12px transparent; opacity: 0.85; }
+}
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Sensible defaults for marketing sites. */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-ink-900);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: white;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  /* Honor user motion preferences globally. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Scroll-triggered reveal. The hidden state is gated on .js on <html> so the
+   page is fully visible if JS fails or is disabled. BaseLayout sets .js
+   synchronously before paint, then an IntersectionObserver adds .is-visible. */
+@layer utilities {
+  .js [data-reveal] {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+  .js [data-reveal].is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .js [data-reveal] { opacity: 1; transform: none; transition: none; }
+  }
+
+  /* Animated mesh gradient used by Hero/FAQ/CTA backgrounds. Deep navy base with
+     vivid brand-blue and a subtle accent (amber) shimmer for warmth. */
+  .bg-mesh-brand {
+    background-color: var(--color-brand-900);
+    background-image:
+      radial-gradient(at 15% 12%, oklch(0.48 0.20 250 / 0.95) 0px, transparent 55%),
+      radial-gradient(at 82% 18%, oklch(0.62 0.18 60 / 0.32) 0px, transparent 50%),
+      radial-gradient(at 28% 88%, oklch(0.42 0.18 250 / 0.85) 0px, transparent 55%),
+      radial-gradient(at 88% 82%, oklch(0.55 0.20 250 / 0.55) 0px, transparent 55%);
+  }
+  .bg-mesh-dark {
+    background-color: var(--color-ink-950);
+    background-image:
+      radial-gradient(at 18% 12%, oklch(0.40 0.18 250 / 0.95) 0px, transparent 55%),
+      radial-gradient(at 82% 22%, oklch(0.62 0.18 60 / 0.30) 0px, transparent 50%),
+      radial-gradient(at 60% 90%, oklch(0.32 0.14 250 / 0.95) 0px, transparent 55%);
+  }
+  /* Soft, atmospheric light gradient — for the "white" sections so they're
+     not bald. The color spans the whole surface so it doesn't cut off at
+     section edges like positioned blobs do. */
+  .bg-mesh-light {
+    background-color: var(--color-brand-50);
+    background-image:
+      radial-gradient(at 22% 15%, oklch(0.86 0.08 250 / 0.55) 0px, transparent 55%),
+      radial-gradient(at 78% 25%, oklch(0.93 0.06 60 / 0.20) 0px, transparent 50%),
+      radial-gradient(at 30% 85%, oklch(0.88 0.10 250 / 0.50) 0px, transparent 55%),
+      radial-gradient(at 82% 88%, oklch(0.86 0.08 250 / 0.55) 0px, transparent 55%);
+  }
+
+  /* Subtle dot grid background. */
+  .bg-dot-grid {
+    background-image: radial-gradient(currentColor 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--color-ink-200);
+  }
+
+  /* Gradient text helper. */
+  .text-gradient-brand {
+    background: linear-gradient(110deg, var(--color-brand-800), var(--color-brand-500) 55%, var(--color-brand-700));
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient-x 7s ease-in-out infinite;
+  }
+}

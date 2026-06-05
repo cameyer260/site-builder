@@ -1,0 +1,63 @@
+---
+interface Props {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  /** Use h1 for the primary heading of a page; defaults to h2 for page sections. */
+  as?: "h1" | "h2" | "h3";
+  align?: "left" | "center";
+  /** "dark" inverts text/eyebrow colors for use on dark backgrounds. */
+  tone?: "light" | "dark";
+  class?: string;
+}
+
+const {
+  eyebrow,
+  title,
+  description,
+  as: HeadingTag = "h2",
+  align = "center",
+  tone = "light",
+  class: className = "",
+}: Props = Astro.props;
+
+const alignClass = align === "center" ? "text-center mx-auto" : "text-left";
+const eyebrowClass =
+  align === "center" ? "inline-flex mx-auto" : "inline-flex";
+
+const isDark = tone === "dark";
+const eyebrowColorClass = isDark
+  ? "bg-white/10 backdrop-blur-sm border-white/15 text-white/85"
+  : "bg-brand-50 border-brand-100 text-brand-700";
+const eyebrowDotClass = isDark ? "bg-brand-300" : "bg-brand-500";
+const titleColorClass = isDark ? "text-white" : "text-ink-900";
+const descriptionColorClass = isDark ? "text-white/70" : "text-ink-600";
+---
+
+<header class={`max-w-2xl ${alignClass} ${className}`}>
+  {eyebrow && (
+    <p
+      class={`items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold uppercase tracking-widest mb-4 ${eyebrowColorClass} ${eyebrowClass}`}
+      data-reveal
+    >
+      <span class={`w-1.5 h-1.5 rounded-full ${eyebrowDotClass}`} aria-hidden="true"></span>
+      {eyebrow}
+    </p>
+  )}
+  <HeadingTag
+    class={`text-3xl sm:text-4xl lg:text-[2.625rem] font-bold leading-tight tracking-tight ${titleColorClass}`}
+    data-reveal
+    data-reveal-delay="60"
+  >
+    {title}
+  </HeadingTag>
+  {description && (
+    <p
+      class={`mt-4 text-lg leading-relaxed ${descriptionColorClass}`}
+      data-reveal
+      data-reveal-delay="140"
+    >
+      {description}
+    </p>
+  )}
+</header>

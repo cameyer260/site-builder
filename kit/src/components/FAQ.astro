@@ -1,0 +1,39 @@
+---
+interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+interface Props {
+  items: FaqItem[];
+  class?: string;
+}
+
+const { items, class: className = "" } = Astro.props;
+---
+
+<dl class={`space-y-3 ${className}`}>
+  {items.map((item) => (
+    <details
+      class="group rounded-xl border border-ink-200 bg-white shadow-(--shadow-card) overflow-hidden hover:border-brand-200 hover:shadow-(--shadow-lift) motion-safe:transition-all duration-300 open:border-brand-300 open:shadow-(--shadow-lift)"
+    >
+      <summary class="flex items-center justify-between cursor-pointer list-none gap-4 px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500">
+        <dt class="text-base font-semibold text-ink-900 group-hover:text-brand-700 group-open:text-brand-700 motion-safe:transition-colors">{item.question}</dt>
+        <span
+          class="shrink-0 w-8 h-8 rounded-full border border-ink-200 bg-linear-to-br from-ink-50 to-ink-100 text-ink-600 flex items-center justify-center motion-safe:transition-all duration-300 group-open:rotate-45 group-open:from-brand-500 group-open:to-brand-600 group-open:border-brand-500 group-open:text-white group-open:shadow-md group-open:shadow-brand-500/30"
+          aria-hidden="true"
+        >
+          <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="6" y1="1" x2="6" y2="11"></line>
+            <line x1="1" y1="6" x2="11" y2="6"></line>
+          </svg>
+        </span>
+      </summary>
+      <div class="grid grid-rows-[0fr] group-open:grid-rows-[1fr] motion-safe:transition-[grid-template-rows] duration-300 ease-out">
+        <div class="overflow-hidden">
+          <dd class="px-6 pb-5 text-ink-600 leading-relaxed text-base border-t border-ink-100 pt-4 pr-12">{item.answer}</dd>
+        </div>
+      </div>
+    </details>
+  ))}
+</dl>

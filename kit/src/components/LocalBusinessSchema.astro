@@ -1,0 +1,44 @@
+---
+interface Props {
+  name: string;
+  description?: string;
+  url?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  /** Schema.org openingHours strings, e.g. ["Mo-Fr 08:00-18:00", "Sa 09:00-14:00"] */
+  openingHours?: string[];
+  /** Override @type for industry schemas — e.g. "Plumber", "DentalClinic", ["HVACBusiness", "Plumber"] */
+  type?: string | string[];
+}
+
+const {
+  name,
+  description,
+  url,
+  phone,
+  email,
+  address,
+  openingHours,
+  type = "LocalBusiness",
+} = Astro.props;
+
+const schema: Record<string, unknown> = {
+  "@context": "https://schema.org",
+  "@type": type,
+  name,
+  ...(description && { description }),
+  ...(url && { url }),
+  ...(phone && { telephone: phone }),
+  ...(email && { email }),
+  ...(address && {
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: address,
+    },
+  }),
+  ...(openingHours?.length && { openingHours }),
+};
+---
+
+<Fragment set:html={`<script type="application/ld+json">${JSON.stringify(schema)}</script>`} />

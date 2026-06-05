@@ -1,0 +1,103 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import SectionHeading from "@/components/SectionHeading.astro";
+import CTA from "@/components/CTA.astro";
+import { Image } from "astro:assets";
+import { team } from "@/assets";
+
+const values = [
+  {
+    term: "Showing up.",
+    detail: "On time, prepared, and ready to do the job right.",
+    icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  },
+  {
+    term: "Fair pricing.",
+    detail: "Clear estimates and no hidden fees.",
+    icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  },
+  {
+    term: "Quality work.",
+    detail: "We treat every job like our reputation depends on it — because it does.",
+    icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  },
+];
+---
+
+<BaseLayout title="About" description="Learn who we are, what we stand for, and the team behind the work.">
+  <!-- Hero strip -->
+  <section class="relative bg-mesh-brand overflow-hidden">
+    <div class="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full bg-brand-500/40 blur-3xl pointer-events-none motion-safe:animate-blob" aria-hidden="true"></div>
+    <div class="absolute -bottom-32 -left-32 w-[420px] h-[420px] rounded-full bg-accent-500/15 blur-3xl pointer-events-none motion-safe:animate-blob" style="animation-delay: -6s;" aria-hidden="true"></div>
+    <div class="absolute inset-0 bg-dot-grid opacity-[0.08] text-white pointer-events-none" aria-hidden="true"></div>
+    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
+      <SectionHeading
+        eyebrow="About Us"
+        title="A short story about who you are and why customers trust you."
+        description="One or two sentences capturing the founding mission and what sets you apart."
+        as="h1"
+        align="left"
+        tone="dark"
+      />
+      <div class="mt-10 max-w-3xl space-y-6 text-base text-white/75 leading-relaxed" data-reveal data-reveal-delay="200">
+        <p>
+          Replace this paragraph with your company's origin story. Keep it human — what
+          started it, who it serves, and what makes you different from the next listing
+          in the search results.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Values section -->
+  <section class="bg-mesh-light py-16 sm:py-20">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SectionHeading title="What we stand for" align="left" class="mb-8" />
+      <ul class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {values.map((item, i) => (
+          <li
+            class="group relative flex flex-col p-6 rounded-2xl bg-linear-to-br from-white to-ink-50 border border-ink-200 shadow-(--shadow-card) hover:shadow-(--shadow-lift) hover:-translate-y-1 hover:border-brand-200 motion-safe:transition-all duration-300 overflow-hidden"
+            data-reveal
+            data-reveal-delay={String(i * 100)}
+          >
+            <span class="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-brand-700 via-brand-500 to-brand-800 scale-x-0 group-hover:scale-x-100 origin-left motion-safe:transition-transform duration-500" aria-hidden="true"></span>
+            <div class="w-11 h-11 rounded-xl bg-linear-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center mb-4 ring-1 ring-brand-100 group-hover:scale-110 group-hover:rotate-3 motion-safe:transition-transform">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={item.icon}/>
+            </div>
+            <p class="text-ink-700 leading-relaxed">
+              <strong class="block text-ink-900 font-semibold mb-1 group-hover:text-brand-700 motion-safe:transition-colors">{item.term}</strong>
+              {item.detail}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- Team section -->
+  <section class="relative bg-mesh-light py-16 sm:py-20 overflow-hidden">
+    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SectionHeading title="The team" align="left" class="mb-4" />
+      <p class="text-base text-ink-700 leading-relaxed max-w-2xl" data-reveal data-reveal-delay="120">
+        A short paragraph about the founders or key team members. Photos of real people
+        on your About page consistently outperform stock imagery for trust signals.
+      </p>
+      <div class="relative mt-10" data-reveal data-reveal-delay="200">
+        <div class="absolute -inset-3 bg-linear-to-tr from-brand-500/30 via-brand-400/25 to-brand-700/30 rounded-3xl blur-2xl pointer-events-none" aria-hidden="true"></div>
+        <Image
+          src={team}
+          alt="Our team"
+          width={1915}
+          height={821}
+          class="relative w-full rounded-2xl shadow-2xl object-cover ring-1 ring-black/5"
+        />
+      </div>
+    </div>
+  </section>
+
+  <CTA
+    title="Have a project in mind?"
+    primaryCtaLabel="Get a Free Quote"
+    primaryCtaHref="/contact"
+  />
+</BaseLayout>

@@ -1,0 +1,29 @@
+---
+interface Props {
+  src?: string;
+  title?: string;
+  class?: string;
+}
+
+const {
+  src,
+  title = "Location map",
+  class: className = "",
+} = Astro.props;
+---
+
+<div class={`relative w-full aspect-video rounded-card overflow-hidden bg-ink-100 ${className}`}>
+  {src ? (
+    <iframe
+      src={src}
+      title={title}
+      loading="lazy"
+      class="absolute inset-0 w-full h-full border-0"
+      referrerpolicy="no-referrer-when-downgrade"
+    ></iframe>
+  ) : (
+    <div class="absolute inset-0 flex items-center justify-center text-ink-500 text-sm">
+      Map embed — set the <code class="px-1 rounded bg-white text-ink-700">src</code> prop to a Google Maps embed URL
+    </div>
+  )}
+</div>

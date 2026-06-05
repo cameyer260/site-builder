@@ -1,0 +1,227 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/Hero.astro";
+import SectionHeading from "@/components/SectionHeading.astro";
+import ServiceCard from "@/components/ServiceCard.astro";
+import TestimonialCard from "@/components/TestimonialCard.astro";
+import FAQ from "@/components/FAQ.astro";
+import CTA from "@/components/CTA.astro";
+import ContactForm from "@/components/ContactForm.astro";
+import { Image } from "astro:assets";
+import { hero } from "@/assets";
+
+const svg = (paths: string) =>
+  `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+
+const icons = {
+  star:    svg('<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'),
+  shield:  svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'),
+  check:   svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'),
+};
+
+const stats = [
+  { value: "500+", label: "Projects completed" },
+  { value: "10+", label: "Years in business" },
+  { value: "★ 5.0", label: "Average rating" },
+  { value: "< 24 h", label: "Response time" },
+];
+
+const services = [
+  {
+    icon: icons.star,
+    title: "Service One",
+    description: "Short blurb describing your headline service and the value it delivers to a customer.",
+  },
+  {
+    icon: icons.shield,
+    title: "Service Two",
+    description: "Short blurb for your second offering. Keep it benefit-focused, not feature-focused.",
+  },
+  {
+    icon: icons.check,
+    title: "Service Three",
+    description: "Short blurb for your third offering. Three to four cards reads cleanly on mobile.",
+  },
+];
+
+const testimonials = [
+  {
+    quote: "These folks were on time, fairly priced, and did exactly what they said they would. Will hire again.",
+    author: "Jamie L.",
+    role: "Local Customer",
+    rating: 5,
+  },
+  {
+    quote: "Quick response, great communication, and the work itself was top-notch. Highly recommend.",
+    author: "Marcus T.",
+    role: "Local Customer",
+    rating: 5,
+  },
+  {
+    quote: "Honest, professional, and went out of their way to make sure we were happy. Five stars.",
+    author: "Priya S.",
+    role: "Local Customer",
+    rating: 5,
+  },
+];
+
+const faqs = [
+  {
+    question: "How do I get a quote?",
+    answer: "Fill out the form below or call us directly — we'll get back to you within one business day with a clear, no-surprise estimate.",
+  },
+  {
+    question: "What areas do you serve?",
+    answer: "We work throughout the greater metro area. Reach out and we'll confirm we cover your address before scheduling.",
+  },
+  {
+    question: "Are you licensed and insured?",
+    answer: "Yes — we are fully licensed, insured, and bonded. We're happy to share documentation on request.",
+  },
+  {
+    question: "What payment methods do you accept?",
+    answer: "We accept all major credit cards, ACH transfer, and check. Larger projects can be split into milestone payments.",
+  },
+];
+---
+
+<BaseLayout>
+  <Hero
+    eyebrow="Trusted locally since 2010"
+    title="One sentence that says exactly what you do and who it's for."
+    subtitle="A supporting sentence that builds trust — mention years in business, your service area, or what makes you different."
+    primaryCtaLabel="Get a Free Quote"
+    primaryCtaHref="/contact"
+    secondaryCtaLabel="See Our Services"
+    secondaryCtaHref="/services"
+  >
+    <Image
+      slot="visual"
+      src={hero}
+      alt="Our team on the job"
+      width={1448}
+      height={1086}
+      class="w-full rounded-2xl shadow-2xl object-cover aspect-4/3 ring-1 ring-black/5"
+    />
+  </Hero>
+
+  <!-- Trust / stats strip -->
+  <div class="relative bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+      <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-8 text-center">
+        {stats.map((stat, i) => (
+          <div
+            class="relative group"
+            data-reveal
+            data-reveal-delay={String(i * 80)}
+          >
+            <dt class="text-3xl sm:text-4xl font-bold tracking-tight text-gradient-brand">{stat.value}</dt>
+            <dd class="mt-1.5 text-sm text-ink-500 font-medium">{stat.label}</dd>
+            {i < stats.length - 1 && (
+              <span
+                class="hidden md:block absolute right-0 top-1/2 -translate-y-1/2 w-px h-10 bg-ink-200"
+                aria-hidden="true"
+              ></span>
+            )}
+          </div>
+        ))}
+      </dl>
+    </div>
+  </div>
+
+  <!-- Services -->
+  <section class="relative bg-mesh-light py-20 sm:py-28 overflow-hidden" id="services">
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SectionHeading
+        eyebrow="What We Do"
+        title="Services built around your needs"
+        description="A short paragraph framing your services. Speak to outcomes, not deliverables."
+      />
+      <div class="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-fr">
+        {services.map((s, i) => (
+          <div data-reveal data-reveal-delay={String(i * 100)} class="h-full">
+            <ServiceCard
+              icon={s.icon}
+              title={s.title}
+              description={s.description}
+              href="/services"
+              class="h-full"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="relative bg-mesh-light py-20 sm:py-28 overflow-hidden" id="testimonials">
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SectionHeading
+        eyebrow="Reviews"
+        title="What our customers are saying"
+        description="Real feedback from real clients."
+      />
+      <div class="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6">
+        {testimonials.map((t, i) => (
+          <div data-reveal data-reveal-delay={String(i * 100)}>
+            <TestimonialCard
+              quote={t.quote}
+              author={t.author}
+              role={t.role}
+              rating={t.rating}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="relative bg-mesh-brand py-20 sm:py-28 overflow-hidden" id="faq">
+    <div
+      class="absolute -top-40 -left-32 w-[520px] h-[520px] rounded-full bg-brand-500/30 blur-3xl pointer-events-none motion-safe:animate-blob"
+      aria-hidden="true"
+    ></div>
+    <div
+      class="absolute -bottom-32 -right-32 w-[480px] h-[480px] rounded-full bg-accent-500/15 blur-3xl pointer-events-none motion-safe:animate-blob"
+      style="animation-delay: -6s;"
+      aria-hidden="true"
+    ></div>
+    <div class="absolute inset-0 bg-dot-grid opacity-[0.06] text-white pointer-events-none" aria-hidden="true"></div>
+    <div class="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SectionHeading
+        eyebrow="FAQ"
+        title="Common questions, answered"
+        align="left"
+        tone="dark"
+      />
+      <div class="mt-10" data-reveal>
+        <FAQ items={faqs} />
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section class="relative bg-mesh-light py-20 sm:py-28 overflow-hidden" id="contact">
+    <div class="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SectionHeading
+        eyebrow="Get in Touch"
+        title="Ready to start? Send us a note."
+        description="Fill out the form and we'll respond within one business day."
+        align="left"
+      />
+      <div class="mt-10 bg-white rounded-3xl border border-ink-200 shadow-(--shadow-card) p-6 sm:p-10" data-reveal>
+        <ContactForm />
+      </div>
+    </div>
+  </section>
+
+  <CTA
+    title="Talk to a real human today."
+    description="No bots, no call-centers — just a quick, friendly conversation about what you need."
+    primaryCtaLabel="Call Now"
+    primaryCtaHref="tel:+15551234567"
+    secondaryCtaLabel="Email Us"
+    secondaryCtaHref="mailto:hello@acme.example"
+  />
+</BaseLayout>

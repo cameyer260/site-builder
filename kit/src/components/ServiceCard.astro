@@ -1,0 +1,53 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  icon?: string;
+  href?: string;
+  class?: string;
+}
+
+const {
+  title,
+  description,
+  icon,
+  href,
+  class: className = "",
+} = Astro.props;
+
+const Tag = href ? "a" : "div";
+---
+
+<Tag
+  {...(href ? { href } : {})}
+  class={`group relative flex flex-col p-7 rounded-2xl bg-white border border-ink-200 shadow-(--shadow-card) hover:shadow-(--shadow-lift) hover:border-brand-200 hover:-translate-y-1 motion-safe:transition-all duration-300 overflow-hidden ${className}`}
+>
+  <!-- Top gradient accent that grows on hover -->
+  <span
+    class="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-brand-700 via-brand-500 to-brand-800 scale-x-0 group-hover:scale-x-100 origin-left motion-safe:transition-transform duration-500 ease-out"
+    aria-hidden="true"
+  ></span>
+
+  <!-- Soft corner glow on hover -->
+  <span
+    class="pointer-events-none absolute -top-12 -right-12 w-40 h-40 rounded-full bg-brand-100/0 group-hover:bg-brand-100/70 blur-2xl motion-safe:transition-colors duration-500"
+    aria-hidden="true"
+  ></span>
+
+  {(icon || Astro.slots.has('icon')) && (
+    <div class="relative w-12 h-12 rounded-xl bg-linear-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center mb-5 ring-1 ring-brand-100 group-hover:from-brand-100 group-hover:to-brand-200 group-hover:text-brand-700 group-hover:scale-110 group-hover:rotate-3 motion-safe:transition-all duration-300">
+      {Astro.slots.has('icon') ? <slot name="icon" /> : <Fragment set:html={icon} />}
+    </div>
+  )}
+  <h3 class="relative text-lg font-semibold text-ink-900 group-hover:text-brand-700 motion-safe:transition-colors">{title}</h3>
+  <p class="relative mt-2 text-ink-600 leading-relaxed flex-1">{description}</p>
+  {href && (
+    <p class="relative mt-5 text-sm font-semibold text-brand-600 group-hover:text-brand-700 flex items-center gap-1.5">
+      <span>Learn more<span class="sr-only"> about {title}</span></span>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="motion-safe:transition-transform duration-200 group-hover:translate-x-1">
+        <path d="M2 7h10M8 3l4 4-4 4"/>
+      </svg>
+    </p>
+  )}
+  <slot />
+</Tag>

@@ -1,0 +1,15 @@
+@import "./theme.css";
+
+/*
+ * Per-client theme overrides go here. Re-declare any @theme token from
+ * theme.css to re-brand without editing the shared token file.
+ *
+ * Example — swap the brand ramp to a warm red and change the display font:
+ *
+ * @theme {
+ *   --color-brand-500: oklch(0.65 0.18 25);
+ *   --color-brand-600: oklch(0.55 0.18 25);
+ *   --color-brand-700: oklch(0.45 0.16 25);
+ *   --font-display: "Playfair Display", serif;
+ * }
+ */
