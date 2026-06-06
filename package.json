@@ -4,6 +4,7 @@
   "description": "Generates working prototype websites for prospective freelance clients.",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.3.14",
   "bin": {
     "sb": "./bin/sb.ts"
   },
