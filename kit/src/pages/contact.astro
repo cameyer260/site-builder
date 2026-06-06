@@ -34,7 +34,7 @@ import { site } from "@/data/site";
         >
           <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-widest text-brand-700 mb-2">Send a message</p>
-            <h3 class="text-2xl font-bold text-ink-900">Tell us about your project</h3>
+            <h2 class="text-2xl font-bold text-ink-900">Tell us about your project</h2>
           </div>
           <ContactForm />
         </div>
@@ -49,7 +49,7 @@ import { site } from "@/data/site";
             <p class="text-xs font-semibold uppercase tracking-widest text-brand-700 mb-4">
               Reach us directly
             </p>
-            <dl class="space-y-3 text-base">
+            <div class="space-y-3 text-base">
               <div class="group flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 ring-1 ring-brand-100 group-hover:bg-brand-100 motion-safe:transition-colors">
                   <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -57,12 +57,12 @@ import { site } from "@/data/site";
                   </svg>
                 </div>
                 <div>
-                  <dt class="text-xs text-ink-500">Phone</dt>
-                  <dd>
+                  <p class="text-xs text-ink-500">Phone</p>
+                  <p>
                     <a href={`tel:${site.phone.replace(/[^\d+]/g, "")}`} class="text-ink-900 font-medium hover:text-brand-700 transition-colors">
                       {site.phone}
                     </a>
-                  </dd>
+                  </p>
                 </div>
               </div>
               <div class="group flex items-center gap-3">
@@ -73,12 +73,12 @@ import { site } from "@/data/site";
                   </svg>
                 </div>
                 <div>
-                  <dt class="text-xs text-ink-500">Email</dt>
-                  <dd>
+                  <p class="text-xs text-ink-500">Email</p>
+                  <p>
                     <a href={`mailto:${site.email}`} class="text-ink-900 font-medium hover:text-brand-700 transition-colors">
                       {site.email}
                     </a>
-                  </dd>
+                  </p>
                 </div>
               </div>
               <div class="group flex items-start gap-3">
@@ -89,11 +89,11 @@ import { site } from "@/data/site";
                   </svg>
                 </div>
                 <div>
-                  <dt class="text-xs text-ink-500">Address</dt>
-                  <dd class="text-ink-900 font-medium">{site.address}</dd>
+                  <p class="text-xs text-ink-500">Address</p>
+                  <p class="text-ink-900 font-medium">{site.address}</p>
                 </div>
               </div>
-            </dl>
+            </div>
           </div>
 
           <BusinessHours hours={[...site.hours]} />

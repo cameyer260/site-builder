@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EngineResult, EngineRunner } from "../../src/engine/runner.ts";
 import { CHECKLIST } from "../../src/synthesize/checklist.ts";
@@ -7,8 +7,9 @@ import { CHECKLIST } from "../../src/synthesize/checklist.ts";
  * An in-process fake of `runEngine` for the AI stages: instead of spawning
  * `claude -p`, it writes the on-disk artifacts the real model would, so the
  * pipeline can be exercised offline and deterministically. It dispatches on the
- * target file named in the prompt (synthesize's two calls write `assets.json`
- * and `profile.json`/`profile.md` respectively).
+ * prompt — synthesize's two calls write `assets.json` and
+ * `profile.json`/`profile.md`; generate's two calls write `brief.md` and a
+ * tailored `site.ts` + declared image slot — covering the full pipeline.
  */
 
 const ok = (): EngineResult => ({
@@ -57,6 +58,22 @@ const DEFAULT_PROFILE = {
 
 export function fakeStageEngine(options: FakeStageEngineOptions = {}): EngineRunner {
   return async (_engineBin, opts) => {
+    // generate's Design Brief call
+    if (opts.prompt.includes("art director defining the Design Brief")) {
+      writeFileSync(join(opts.cwd, "brief.md"), "# Design Brief\n\nClean and modern.\n");
+      return ok();
+    }
+    // generate's Site build call
+    if (opts.prompt.includes("building a production-quality marketing website")) {
+      mkdirSync(join(opts.cwd, "src", "data"), { recursive: true });
+      writeFileSync(join(opts.cwd, "src", "data", "site.ts"), "export const site = {};\n");
+      mkdirSync(join(opts.cwd, "generate"), { recursive: true });
+      writeFileSync(
+        join(opts.cwd, "generate", "images.json"),
+        JSON.stringify({ slots: [{ id: "hero", query: "office", orientation: "landscape" }] }),
+      );
+      return ok();
+    }
     if (opts.prompt.includes("assets.json")) {
       writeFileSync(
         join(opts.cwd, "assets.json"),

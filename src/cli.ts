@@ -17,8 +17,10 @@ Commands:
   config path            Print the config file path
 
   build <client> …       Create a Client and run the full pipeline
-                         flags: --url --docs --images --notes --pages
+                         inputs: --url --docs --images --notes --pages
+                         generate: --vibe <text> --style <text> --yes (skip QA)
   resume <client>        Continue a failed run from its last incomplete stage
+                         flags: --vibe --style --yes
   status <client>        Show pipeline state for a Client
 
   help                   Show this help

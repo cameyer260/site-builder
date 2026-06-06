@@ -4,10 +4,13 @@ interface Props {
   description: string;
   icon?: string;
   href?: string;
+  /** Heading level for the card title. Use h2 when cards sit directly under a
+   * page h1 (e.g. the services index); defaults to h3 for cards under a section h2. */
+  as?: "h2" | "h3";
   class?: string;
 }
 
-const { title, description, icon, href, class: className = "" } = Astro.props;
+const { title, description, icon, href, as: Heading = "h3", class: className = "" } = Astro.props;
 
 const Tag = href ? "a" : "div";
 ---
@@ -33,7 +36,7 @@ const Tag = href ? "a" : "div";
       {Astro.slots.has('icon') ? <slot name="icon" /> : <Fragment set:html={icon} />}
     </div>
   )}
-  <h3 class="relative text-lg font-semibold text-ink-900 group-hover:text-brand-700 motion-safe:transition-colors">{title}</h3>
+  <Heading class="relative text-lg font-semibold text-ink-900 group-hover:text-brand-700 motion-safe:transition-colors">{title}</Heading>
   <p class="relative mt-2 text-ink-600 leading-relaxed flex-1">{description}</p>
   {href && (
     <p class="relative mt-5 text-sm font-semibold text-brand-600 group-hover:text-brand-700 flex items-center gap-1.5">

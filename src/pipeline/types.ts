@@ -1,3 +1,4 @@
+import type { SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
 import type { EngineRunner } from "../engine/runner.ts";
 import type { ClientInputs } from "../storage/client.ts";
@@ -30,6 +31,21 @@ export interface RunContext {
    * to the real `runEngine`); tests inject a fake to stay offline.
    */
   engine?: EngineRunner;
+  /**
+   * Compile gate for `generate` (npm install + `astro build`). Unset in
+   * production (defaults to the real one); full-pipeline tests inject a stub so
+   * they don't shell out to npm.
+   */
+  buildSite?: SiteBuilder;
+  /**
+   * Whether the run may prompt the operator (the QA session gate). True only on
+   * an interactive TTY without `--yes`; false in CI/tests → Unknowns become
+   * Guessed (CONTEXT.md > QA session).
+   */
+  interactive?: boolean;
+  /** Design Brief steering for `generate` (`--vibe`/`--style`). */
+  vibe?: string;
+  style?: string;
 }
 
 export interface Stage {

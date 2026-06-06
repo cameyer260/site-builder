@@ -8,7 +8,7 @@ import { clientExists } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 
 const USAGE =
-  "usage: sb build <client> [--url <url>] [--docs <path>…] [--images <path>…] [--notes <text>] [--pages <n>]";
+  "usage: sb build <client> [--url <url>] [--docs <path>…] [--images <path>…] [--notes <text>] [--pages <n>] [--vibe <text>] [--style <text>] [--yes]";
 
 /** Flattens repeated and comma-separated list flags into a clean string[]. */
 function splitList(values: string[] | undefined): string[] {
@@ -28,6 +28,9 @@ export async function buildCommand(args: string[]): Promise<number> {
       images: { type: "string", multiple: true },
       notes: { type: "string" },
       pages: { type: "string" },
+      vibe: { type: "string" },
+      style: { type: "string" },
+      yes: { type: "boolean", short: "y" },
     },
   });
 
@@ -74,7 +77,20 @@ export async function buildCommand(args: string[]): Promise<number> {
     );
   }
 
-  const ctx = buildRunContext({ config, name, version: 1, command: "build", inputs, pageCap });
+  // The QA gate prompts only on a real terminal and when not waved through with --yes.
+  const interactive = Boolean(process.stdin.isTTY) && !values.yes;
+
+  const ctx = buildRunContext({
+    config,
+    name,
+    version: 1,
+    command: "build",
+    inputs,
+    pageCap,
+    interactive,
+    vibe: values.vibe,
+    style: values.style,
+  });
   ctx.log.step(`building Client "${name}" at ${ctx.paths.dir}`);
 
   const result = await runBuild(ctx);

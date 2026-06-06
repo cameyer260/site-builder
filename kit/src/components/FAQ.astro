@@ -12,15 +12,15 @@ interface Props {
 const { items, class: className = "" } = Astro.props;
 ---
 
-<dl class={`space-y-3 ${className}`}>
+<div data-faq class={`space-y-3 ${className}`}>
   {items.map((item) => (
     <details
-      class="group rounded-xl border border-ink-200 bg-white shadow-(--shadow-card) overflow-hidden hover:border-brand-200 hover:shadow-(--shadow-lift) motion-safe:transition-all duration-300 open:border-brand-300 open:shadow-(--shadow-lift)"
+      class="group rounded-xl border border-ink-200 bg-white shadow-(--shadow-card) overflow-hidden hover:border-brand-200 hover:shadow-(--shadow-lift) motion-safe:transition-[border-color,box-shadow] duration-300 [&.is-open]:border-brand-300 [&.is-open]:shadow-(--shadow-lift)"
     >
       <summary class="flex items-center justify-between cursor-pointer list-none gap-4 px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500">
-        <dt class="text-base font-semibold text-ink-900 group-hover:text-brand-700 group-open:text-brand-700 motion-safe:transition-colors">{item.question}</dt>
+        <span class="text-base font-semibold text-ink-900 group-hover:text-brand-700 group-[.is-open]:text-brand-700 motion-safe:transition-colors">{item.question}</span>
         <span
-          class="shrink-0 w-8 h-8 rounded-full border border-ink-200 bg-linear-to-br from-ink-50 to-ink-100 text-ink-600 flex items-center justify-center motion-safe:transition-all duration-300 group-open:rotate-45 group-open:from-brand-500 group-open:to-brand-600 group-open:border-brand-500 group-open:text-white group-open:shadow-md group-open:shadow-brand-500/30"
+          class="shrink-0 w-8 h-8 rounded-full border border-ink-200 bg-linear-to-br from-ink-50 to-ink-100 text-ink-600 flex items-center justify-center motion-safe:transition-all duration-300 group-[.is-open]:rotate-45 group-[.is-open]:from-brand-500 group-[.is-open]:to-brand-600 group-[.is-open]:border-brand-500 group-[.is-open]:text-white group-[.is-open]:shadow-md group-[.is-open]:shadow-brand-500/30"
           aria-hidden="true"
         >
           <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -29,11 +29,104 @@ const { items, class: className = "" } = Astro.props;
           </svg>
         </span>
       </summary>
-      <div class="grid grid-rows-[0fr] group-open:grid-rows-[1fr] motion-safe:transition-[grid-template-rows] duration-300 ease-out">
-        <div class="overflow-hidden">
-          <dd class="px-6 pb-5 text-ink-600 leading-relaxed text-base border-t border-ink-100 pt-4 pr-12">{item.answer}</dd>
-        </div>
+      <div data-faq-panel class="overflow-hidden">
+        <p class="px-6 pb-5 text-ink-600 leading-relaxed text-base border-t border-ink-100 pt-4 pr-12">{item.answer}</p>
       </div>
     </details>
   ))}
-</dl>
+</div>
+
+<script>
+  // Reliable open/close animation for the FAQ <details> elements.
+  //
+  // The native CSS approaches (animating grid-template-rows or
+  // ::details-content) are inconsistent across browsers because a closed
+  // <details> doesn't render its content, so there's no "from" frame to
+  // interpolate. Instead we keep the native <details> semantics (keyboard,
+  // screen readers, no-JS toggle) and animate the element's height with the
+  // Web Animations API on toggle — which works the same everywhere.
+  //
+  // The open-state visuals (icon, border, shadow) are driven by an `is-open`
+  // class rather than the native [open] attribute. That lets them ease back to
+  // the closed look at the *start* of the collapse — while [open] must stay set
+  // until the height animation ends so the content is still rendered — keeping
+  // the open and close transitions perfectly symmetric.
+  //
+  // Respects prefers-reduced-motion: when "reduce" is set we don't intercept
+  // the click, so the browser performs its normal instant toggle.
+  const DURATION = 300;
+
+  function setupAccordion(details: HTMLDetailsElement) {
+    const summary = details.querySelector<HTMLElement>("summary");
+    const panel = details.querySelector<HTMLElement>("[data-faq-panel]");
+    if (!summary || !panel) return;
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let animation: Animation | null = null;
+    let state: "idle" | "expanding" | "shrinking" = "idle";
+
+    // Keep `is-open` in sync with the real state for native/reduced-motion
+    // toggles and the end of each animation.
+    details.addEventListener("toggle", () => {
+      details.classList.toggle("is-open", details.open);
+    });
+
+    const animateTo = (from: number, to: number, finalOpen: boolean) => {
+      animation?.cancel();
+      animation = details.animate(
+        { height: [`${from}px`, `${to}px`] },
+        { duration: DURATION, easing: "ease-out" },
+      );
+      animation.onfinish = () => {
+        details.open = finalOpen;
+        details.style.height = "";
+        details.style.overflow = "";
+        animation = null;
+        state = "idle";
+      };
+      animation.oncancel = () => {
+        state = "idle";
+      };
+    };
+
+    const expand = () => {
+      state = "expanding";
+      animateTo(details.offsetHeight, summary.offsetHeight + panel.offsetHeight, true);
+    };
+
+    const shrink = () => {
+      state = "shrinking";
+      // Drop the open look now so the icon/border ease out with the collapse,
+      // even though [open] stays set until the animation finishes.
+      details.classList.remove("is-open");
+      animateTo(details.offsetHeight, summary.offsetHeight, false);
+    };
+
+    summary.addEventListener("click", (event) => {
+      // Honor reduced-motion (and let modifier-clicks behave normally).
+      if (reduce.matches) return;
+      event.preventDefault();
+      details.style.overflow = "hidden";
+      if (state === "shrinking" || !details.open) {
+        // Lock current height, reveal content so it can be measured, then grow.
+        details.style.height = `${details.offsetHeight}px`;
+        details.open = true;
+        requestAnimationFrame(expand);
+      } else if (state === "expanding" || details.open) {
+        shrink();
+      }
+    });
+  }
+
+  function initFaq() {
+    document
+      .querySelectorAll<HTMLDetailsElement>("[data-faq] details")
+      .forEach(setupAccordion);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initFaq);
+  } else {
+    initFaq();
+  }
+</script>

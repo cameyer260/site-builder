@@ -18,6 +18,9 @@ export function buildRunContext(opts: {
   command: string;
   inputs?: ClientInputs;
   pageCap?: number;
+  interactive?: boolean;
+  vibe?: string;
+  style?: string;
 }): RunContext {
   const paths = clientPaths(opts.config.root, opts.name);
   mkdirSync(paths.dir, { recursive: true });
@@ -34,5 +37,8 @@ export function buildRunContext(opts: {
     log,
     failAt: process.env.SB_STUB_FAIL || undefined,
     inputs: opts.inputs,
+    interactive: opts.interactive,
+    vibe: opts.vibe,
+    style: opts.style,
   };
 }

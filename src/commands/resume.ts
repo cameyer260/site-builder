@@ -6,10 +6,18 @@ import { buildRunContext } from "../runtime.ts";
 import { clientExists, clientPaths, latestVersion } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 
-const USAGE = "usage: sb resume <client>";
+const USAGE = "usage: sb resume <client> [--vibe <text>] [--style <text>] [--yes]";
 
 export async function resumeCommand(args: string[]): Promise<number> {
-  const { positionals } = parseArgs({ args, allowPositionals: true, options: {} });
+  const { positionals, values } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: {
+      vibe: { type: "string" },
+      style: { type: "string" },
+      yes: { type: "boolean", short: "y" },
+    },
+  });
   const name = positionals[0];
   if (!name) {
     throw new UserError("missing client name", USAGE);
@@ -24,7 +32,16 @@ export async function resumeCommand(args: string[]): Promise<number> {
   const paths = clientPaths(config.root, name);
   const version = latestVersion(paths.sites) ?? 1;
 
-  const ctx = buildRunContext({ config, name, version, command: "resume" });
+  const interactive = Boolean(process.stdin.isTTY) && !values.yes;
+  const ctx = buildRunContext({
+    config,
+    name,
+    version,
+    command: "resume",
+    interactive,
+    vibe: values.vibe,
+    style: values.style,
+  });
   const result = await resumePipeline(ctx);
   if (result.ok) {
     if (result.ran.length > 0) {

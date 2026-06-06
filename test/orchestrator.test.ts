@@ -37,8 +37,10 @@ function makeCtx(
     log: createLogger({ quiet: true }),
     failAt: opts.failAt,
     inputs: opts.withInputs === false ? undefined : INPUTS,
-    // synthesize is a real AI stage now; inject a fake engine to stay offline.
+    // synthesize/generate are real AI stages now; inject a fake engine to stay
+    // offline and stub generate's compile gate so it doesn't shell out to npm.
     engine: opts.engine ?? fakeStageEngine(),
+    buildSite: async () => ({ ok: true, code: 0, output: "" }),
   };
 }
 

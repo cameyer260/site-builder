@@ -101,7 +101,7 @@ const copyrightName = siteName.replace(/\.$/, "");
             </div>
           )}
           {address && (
-            <div class="flex items-start gap-2 text-ink-500">
+            <div class="flex items-start gap-2 text-ink-400">
               <svg class="w-4 h-4 text-brand-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                 <circle cx="12" cy="10" r="3"/>
@@ -134,7 +134,7 @@ const copyrightName = siteName.replace(/\.$/, "");
     </div>
 
     <div class="mt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <p class="text-xs text-ink-500">&copy; {year} {copyrightName}. All rights reserved.</p>
+      <p class="text-xs text-ink-400">&copy; {year} {copyrightName}. All rights reserved.</p>
       {socials.length > 0 && (
         <ul class="flex items-center gap-2">
           {socials.map((s) => (
