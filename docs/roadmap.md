@@ -18,7 +18,7 @@ Everything here is **explicitly out of scope for v1**. It is the single home for
 
 ## Audit
 
-- **Multi-pass audit loop.** v1 does one review + one fix pass. Later: repeat review→fix with a re-screenshot verification step until the site converges or a pass budget is hit.
+- **Multi-pass audit loop + score gating.** v1 does one review + one fix pass and records Lighthouse as non-gating evidence (the Scorecard; ADR-0007). Later: median-of-N Lighthouse runs to de-noise, a bounded `audit → fix → re-audit` loop with a re-screenshot verification step until convergence or a pass budget, and score-threshold gating (A11y/BP/SEO=100, Perf≥95) with a notify-on-non-convergence report. This perfect-score work belongs to paid production builds, not the prototype tool.
 
 ## Operations & usage
 

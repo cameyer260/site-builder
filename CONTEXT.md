@@ -72,7 +72,11 @@ A short, explicit statement of one Site Version's visual direction — palette, 
 _Avoid_: theme, style guide, moodboard
 
 **`audit`**:
-Runs against the locally built Site (`astro preview`), pre-deploy. Combines deterministic checks (axe-core accessibility, broken-link/asset check, Lighthouse via the `lighthouse` npm package) with an AI review (desktop + mobile screenshots for visual quality; built source read directly for content accuracy and leftover placeholders). Produces a structured audit file in `sites/vN/audit/`; `claude -p` then applies one fix pass, re-gated by `astro build`. Review + fix in one stage; a multi-pass verify loop is a deferred improvement.
+Runs against the locally built Site (`astro preview`), pre-deploy. An AI review (desktop + mobile screenshots for visual quality; built source read directly for content accuracy and leftover placeholders), informed by deterministic checks (axe-core accessibility, broken-link/asset check), drives one fix pass, re-gated by `astro build`. Lighthouse (via the `lighthouse` npm package) then measures the fixed Site to produce the **Scorecard**. Lighthouse is non-gating evidence — `astro build` is the only hard gate; a low score is recorded, never blocking. Produces a structured audit file in `sites/vN/audit/`. Review + fix in one stage; a multi-pass verify loop (and any score-threshold gating) is a deferred improvement.
+
+**Scorecard**:
+The persisted record of one Site Version's achieved Lighthouse scores — Performance, Accessibility, Best Practices, SEO — captured per Lighthouse form factor (its own mobile and desktop presets, distinct from a `Viewport Profile`) after the `audit` fix pass. Stored under `sites/vN/audit/` and surfaced to the client as evidence of quality, in place of any bare "perfect 100s" claim.
+_Avoid_: report, evidence, results
 
 **`deploy`**:
 Publishes the built Site to Cloudflare Pages via Wrangler Direct Upload (`wrangler pages deploy`) and returns a shareable `*.pages.dev` URL. No GitHub repo is involved. Pure code.

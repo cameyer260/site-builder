@@ -65,11 +65,12 @@ Craftsmanship; can be built in parallel with 1–3, but gates `generate`.
 
 ## Phase 6 — `audit`
 
-- `astro preview` server; reuse the screenshot component (desktop + mobile).
-- Deterministic checks: `axe-core`, broken-link/asset check, `lighthouse`.
-- `claudey -p` review → `audit/audit.md`; one fix pass; `astro build` re-gate.
+- `astro preview` server; reuse the screenshot component (desktop + mobile) and `src/astro/run.ts` for the re-gate.
+- Deterministic fix-drivers fed into the review: `axe-core` (a11y), broken-link/asset check.
+- `claudey -p` review → `audit/audit.md`; **one** fix pass; `astro build` re-gate. Review + fix only, no loop (ADR-0007).
+- **Scorecard** (ADR-0007): *after* the fix + re-gate, run `lighthouse` once per form factor (mobile + desktop) on the homepage via `chrome-launcher` pointed at the Playwright Chromium (`CHROME_PATH`, `--no-sandbox --headless=new`). Write `audit/lighthouse.json` (4 category scores per form factor + LCP/CLS/TBT) and prepend a scores table to `audit/audit.md`. **Non-gating** — recorded, never blocking; `astro build` stays the only hard gate.
 
-**Milestone:** audit produces a real findings file and measurably improves the site in the fix pass.
+**Milestone:** audit produces a real findings file, measurably improves the site in the fix pass, and emits a Scorecard with both form factors' scores.
 
 ## Phase 7 — `deploy`
 
