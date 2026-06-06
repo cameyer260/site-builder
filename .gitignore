@@ -6,3 +6,4 @@ dist/
 *.tsbuildinfo
 NOTES.md
 node_modules.claudey/
+node_modules.codey/
