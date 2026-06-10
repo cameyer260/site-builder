@@ -10,6 +10,7 @@ import { type ClientInputs, ClientInputsSchema, readClient } from "../src/storag
 import { clientPaths } from "../src/storage/layout.ts";
 import { markFailed, readState, writeState } from "../src/storage/state.ts";
 import { createLogger } from "../src/util/log.ts";
+import { fakeInspect, fakeLighthouse } from "./fixtures/fake-audit-tools.ts";
 import { fakeStageEngine } from "./fixtures/fake-stage-engine.ts";
 
 const INPUTS: ClientInputs = ClientInputsSchema.parse({ notes: "a test client" });
@@ -37,10 +38,13 @@ function makeCtx(
     log: createLogger({ quiet: true }),
     failAt: opts.failAt,
     inputs: opts.withInputs === false ? undefined : INPUTS,
-    // synthesize/generate are real AI stages now; inject a fake engine to stay
-    // offline and stub generate's compile gate so it doesn't shell out to npm.
+    // synthesize/generate/audit are real AI stages now; inject a fake engine to
+    // stay offline and stub generate's/audit's compile gate so they don't shell
+    // out to npm. audit's preview/browser/Lighthouse are stubbed too.
     engine: opts.engine ?? fakeStageEngine(),
     buildSite: async () => ({ ok: true, code: 0, output: "" }),
+    inspectSite: fakeInspect,
+    runLighthouse: fakeLighthouse,
   };
 }
 

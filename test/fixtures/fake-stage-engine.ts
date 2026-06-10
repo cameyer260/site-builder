@@ -9,7 +9,8 @@ import { CHECKLIST } from "../../src/synthesize/checklist.ts";
  * pipeline can be exercised offline and deterministically. It dispatches on the
  * prompt — synthesize's two calls write `assets.json` and
  * `profile.json`/`profile.md`; generate's two calls write `brief.md` and a
- * tailored `site.ts` + declared image slot — covering the full pipeline.
+ * tailored `site.ts` + declared image slot; audit's review writes `audit.md` —
+ * covering the full pipeline.
  */
 
 const ok = (): EngineResult => ({
@@ -72,6 +73,12 @@ export function fakeStageEngine(options: FakeStageEngineOptions = {}): EngineRun
         join(opts.cwd, "generate", "images.json"),
         JSON.stringify({ slots: [{ id: "hero", query: "office", orientation: "landscape" }] }),
       );
+      return ok();
+    }
+    // audit's review + fix call
+    if (opts.prompt.includes("audit reviewer for a freshly generated")) {
+      mkdirSync(join(opts.cwd, "audit"), { recursive: true });
+      writeFileSync(join(opts.cwd, "audit", "audit.md"), "# Audit\n\nLooks good.\n");
       return ok();
     }
     if (opts.prompt.includes("assets.json")) {

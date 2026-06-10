@@ -1,8 +1,8 @@
-import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UserError } from "../util/errors.ts";
+import { commitAll, gitInit } from "../util/git.ts";
 import type { Logger } from "../util/log.ts";
 
 /**
@@ -46,13 +46,6 @@ export function copyKitInto(destDir: string, log: Logger): void {
   log.step(`generate: copied Kit into ${basename(destDir)}`);
 }
 
-// Commit under an explicit identity so a missing global git config can't fail it.
-const GIT_IDENT = ["-c", "user.name=Site Builder", "-c", "user.email=site-builder@localhost"];
-
-function git(destDir: string, ...args: string[]): boolean {
-  return spawnSync("git", args, { cwd: destDir, stdio: "ignore" }).status === 0;
-}
-
 /**
  * `git init` + a baseline commit of the freshly copied Kit, so the AI build's
  * edits are a reviewable diff. Best-effort: git problems (not installed, no
@@ -60,7 +53,7 @@ function git(destDir: string, ...args: string[]): boolean {
  * gate on producing a building Site.
  */
 export function gitInitBaseline(destDir: string, log: Logger): void {
-  if (!git(destDir, "init", "-q")) {
+  if (!gitInit(destDir)) {
     log.warn("generate: git init unavailable — skipping version history");
     return;
   }
@@ -69,12 +62,4 @@ export function gitInitBaseline(destDir: string, log: Logger): void {
   } else {
     log.warn("generate: baseline commit skipped");
   }
-}
-
-/**
- * Stages everything and commits it under the tool's identity. Returns false
- * (without throwing) when git is unavailable or there is nothing to commit.
- */
-export function commitAll(destDir: string, message: string): boolean {
-  return git(destDir, "add", "-A") && git(destDir, ...GIT_IDENT, "commit", "-q", "-m", message);
 }

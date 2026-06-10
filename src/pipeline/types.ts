@@ -1,4 +1,6 @@
 import type { SiteBuilder } from "../astro/run.ts";
+import type { SiteInspector } from "../audit/inspect.ts";
+import type { LighthouseRunner } from "../audit/lighthouse.ts";
 import type { Config } from "../config/schema.ts";
 import type { EngineRunner } from "../engine/runner.ts";
 import type { ClientInputs } from "../storage/client.ts";
@@ -32,11 +34,22 @@ export interface RunContext {
    */
   engine?: EngineRunner;
   /**
-   * Compile gate for `generate` (npm install + `astro build`). Unset in
+   * Compile gate for `generate`/`audit` (npm install + `astro build`). Unset in
    * production (defaults to the real one); full-pipeline tests inject a stub so
    * they don't shell out to npm.
    */
   buildSite?: SiteBuilder;
+  /**
+   * `audit`'s deterministic inspector (preview + screenshots + axe + link check).
+   * Unset in production (defaults to the real one); tests inject a fake so they
+   * don't serve the Site or launch a browser.
+   */
+  inspectSite?: SiteInspector;
+  /**
+   * `audit`'s Lighthouse Scorecard runner. Unset in production (defaults to the
+   * real one); tests inject a fake so they don't launch Chrome.
+   */
+  runLighthouse?: LighthouseRunner;
   /**
    * Whether the run may prompt the operator (the QA session gate). True only on
    * an interactive TTY without `--yes`; false in CI/tests → Unknowns become

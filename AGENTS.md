@@ -18,7 +18,8 @@ AI-heavy stages.
 - **`docs/adr/000N-*.md`** — the binding architectural decisions. Code comments
   cite them as `ADR-000N`; read the ADR before changing anything that cites it.
   The big ones: 0001 (engine), 0002 (pipeline/resume), 0003 (storage/state),
-  0004 (deploy), 0005 (Kit), 0006 (design intelligence).
+  0004 (deploy), 0005 (Kit), 0006 (design intelligence), 0007 (audit:
+  Lighthouse as evidence, not a gate).
 - **`docs/build-plan.md`** — phase order (0–9) and milestones. **`docs/roadmap.md`**
   — what is *explicitly out of scope for v1*; don't build these without being asked.
 - **`NOTES.md`** — current open TODOs.
@@ -95,19 +96,36 @@ instruction, never baked in. `kit/` is its own Astro project with its own
 fonts, a11y guardrails) comes from the installed `ui-ux-pro-max` skill at
 generate time (ADR-0006), so `sb`'s appended system prompt stays thin.
 
+**`audit`** (`src/audit/`, ADR-0007). Runs against the locally built Site:
+`src/astro/preview.ts` serves `dist/`, then one deterministic pass
+(`inspect.ts`) reuses the screenshot component and runs **axe-core** + a
+broken-link/asset check into `audit/checks.json`. A single engine call reviews
+*and* applies one fix pass (writing `audit/audit.md`); `astro build` re-gates —
+the only hard gate. *After* the re-gate, Lighthouse (`lighthouse.ts`) records
+the **Scorecard** per form factor (`audit/lighthouse.json` + a table prepended
+to `audit.md`) as non-gating evidence — a low score is recorded, never blocking.
+Review + fix only; the multi-pass loop and score gating are deferred. Like
+`generate`, the heavy I/O is behind injectable seams — `RunContext.inspectSite`
+and `RunContext.runLighthouse` (alongside `engine`/`buildSite`) default to the
+real impls and are faked in tests.
+
 **Shared helpers, reused across stages:** `src/astro/run.ts` (the `npm install` +
-`astro build` compile gate — used by `generate`, reused by `audit`),
-`src/playwright/screenshot.ts` (native-resolution screenshots per Viewport
-Profile — used by `ingest`, reused by `audit`). Improving these or the Kit raises
-the floor for every Site at once.
+`astro build` compile gate — `generate`'s gate, `audit`'s re-gate),
+`src/astro/preview.ts` (the `astro preview` server `audit` serves the built Site
+from), `src/playwright/screenshot.ts` (native-resolution screenshots per Viewport
+Profile — `ingest`'s crawl, `audit`'s inspection), and `src/util/git.ts`
+(per–Site-Version commits for `generate` and `audit`). Improving these or the Kit
+raises the floor for every Site at once.
 
 ## Testing posture
 
 Deterministic core (config, state/resume, crawl/markdown, doc extraction) gets
 real **unit tests**. AI stages are tested **offline**: the seams are dependency
-injection — `RunContext.engine` (an `EngineRunner`) and `RunContext.buildSite`
-(a `SiteBuilder`) default to the real implementations in production, but tests
-inject fakes (`test/fixtures/fake-*`) that simulate the model writing its on-disk
-artifacts and stub the npm/Astro build. **Never call the real `claude -p` or shell
-out to npm from a test.** Assert on artifact *shape* and gates (valid JSON,
-build passes, file present), not on exact AI prose.
+injection — `RunContext.engine` (an `EngineRunner`), `RunContext.buildSite`
+(a `SiteBuilder`), and `audit`'s `RunContext.inspectSite` / `RunContext.runLighthouse`
+default to the real implementations in production, but tests inject fakes
+(`test/fixtures/fake-*`) that simulate the model writing its on-disk artifacts and
+stub the npm/Astro build, the preview+browser inspection, and the Lighthouse run.
+**Never call the real `claude -p`, shell out to npm, or launch a browser/Chrome from
+a test.** Assert on artifact *shape* and gates (valid JSON, build passes, file
+present), not on exact AI prose.
