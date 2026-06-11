@@ -11,6 +11,7 @@ import { clientPaths } from "../src/storage/layout.ts";
 import { markFailed, readState, writeState } from "../src/storage/state.ts";
 import { createLogger } from "../src/util/log.ts";
 import { fakeInspect, fakeLighthouse } from "./fixtures/fake-audit-tools.ts";
+import { fakeDeploy } from "./fixtures/fake-deploy.ts";
 import { fakeStageEngine } from "./fixtures/fake-stage-engine.ts";
 
 const INPUTS: ClientInputs = ClientInputsSchema.parse({ notes: "a test client" });
@@ -40,11 +41,13 @@ function makeCtx(
     inputs: opts.withInputs === false ? undefined : INPUTS,
     // synthesize/generate/audit are real AI stages now; inject a fake engine to
     // stay offline and stub generate's/audit's compile gate so they don't shell
-    // out to npm. audit's preview/browser/Lighthouse are stubbed too.
+    // out to npm. audit's preview/browser/Lighthouse and deploy's wrangler upload
+    // are stubbed too.
     engine: opts.engine ?? fakeStageEngine(),
     buildSite: async () => ({ ok: true, code: 0, output: "" }),
     inspectSite: fakeInspect,
     runLighthouse: fakeLighthouse,
+    deploySite: fakeDeploy,
   };
 }
 
@@ -64,8 +67,11 @@ test("happy path: build walks all six stub stages and records both state files",
   expect(generation?.stages.deploy?.status).toBe("completed");
 
   // init registered the Client; ingest (notes-only here) wrote its manifest
-  expect(readClient(ctx.paths.clientJson)?.name).toBe("Acme Co");
+  const client = readClient(ctx.paths.clientJson);
+  expect(client?.name).toBe("Acme Co");
   expect(existsSync(join(ctx.paths.ingest, "manifest.json"))).toBe(true);
+  // deploy recorded the shareable *.pages.dev link on the v1 pointer
+  expect(client?.sites).toEqual([{ version: 1, deployUrl: `https://${ctx.paths.slug}.pages.dev` }]);
 });
 
 test("forced failure records failure and keeps prior stages; resume completes", async () => {

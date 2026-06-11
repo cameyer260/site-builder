@@ -2,6 +2,7 @@ import type { SiteBuilder } from "../astro/run.ts";
 import type { SiteInspector } from "../audit/inspect.ts";
 import type { LighthouseRunner } from "../audit/lighthouse.ts";
 import type { Config } from "../config/schema.ts";
+import type { DeployRunner } from "../deploy/wrangler.ts";
 import type { EngineRunner } from "../engine/runner.ts";
 import type { ClientInputs } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
@@ -50,6 +51,12 @@ export interface RunContext {
    * real one); tests inject a fake so they don't launch Chrome.
    */
   runLighthouse?: LighthouseRunner;
+  /**
+   * `deploy`'s Cloudflare Pages upload runner. Unset in production (defaults to
+   * the real wrangler one); tests inject a fake so they don't shell out to
+   * wrangler or hit the network.
+   */
+  deploySite?: DeployRunner;
   /**
    * Whether the run may prompt the operator (the QA session gate). True only on
    * an interactive TTY without `--yes`; false in CI/tests → Unknowns become

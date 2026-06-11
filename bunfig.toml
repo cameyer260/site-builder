@@ -1,0 +1,5 @@
+[test]
+# Scope `bun test` discovery to the project's own `test/` directory, so it never
+# descends into sibling dependency trees or tooling caches and runs their bundled
+# test suites. All of this project's tests live under `test/`.
+root = "test"

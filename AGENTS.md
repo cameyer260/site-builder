@@ -109,23 +109,37 @@ Review + fix only; the multi-pass loop and score gating are deferred. Like
 and `RunContext.runLighthouse` (alongside `engine`/`buildSite`) default to the
 real impls and are faked in tests.
 
+**`deploy`** (`src/deploy/`, ADR-0004) — pure code, no AI, no GitHub. This is
+v1's core promise: Inputs → shareable live link. `deploy.ts` ensures the Site
+Version has a built `dist/` (rebuilding via `buildSite` only if a standalone
+resume lost it), then `wrangler.ts` Direct-Uploads it to Cloudflare Pages
+(`wrangler pages project create` — idempotent, "already exists" is fine — then
+`wrangler pages deploy`), parses the `*.pages.dev` URL from wrangler's output,
+and records it on the Client's Site Version pointer via
+`recordSiteVersion` (`client.json`, never a stage output → survives resume). One
+Pages project per Client (`pagesProjectName` = the slug, capped at 58). The
+wrangler subprocess is behind the `RunContext.deploySite` seam, faked in tests.
+`sb config` verifies wrangler is present + authed.
+
 **Shared helpers, reused across stages:** `src/astro/run.ts` (the `npm install` +
 `astro build` compile gate — `generate`'s gate, `audit`'s re-gate),
 `src/astro/preview.ts` (the `astro preview` server `audit` serves the built Site
 from), `src/playwright/screenshot.ts` (native-resolution screenshots per Viewport
-Profile — `ingest`'s crawl, `audit`'s inspection), and `src/util/git.ts`
-(per–Site-Version commits for `generate` and `audit`). Improving these or the Kit
-raises the floor for every Site at once.
+Profile — `ingest`'s crawl, `audit`'s inspection), `src/util/git.ts`
+(per–Site-Version commits for `generate` and `audit`), and `runCommand` in
+`src/astro/run.ts` (the generic spawn/capture `deploy` reuses for wrangler).
+Improving these or the Kit raises the floor for every Site at once.
 
 ## Testing posture
 
 Deterministic core (config, state/resume, crawl/markdown, doc extraction) gets
 real **unit tests**. AI stages are tested **offline**: the seams are dependency
 injection — `RunContext.engine` (an `EngineRunner`), `RunContext.buildSite`
-(a `SiteBuilder`), and `audit`'s `RunContext.inspectSite` / `RunContext.runLighthouse`
-default to the real implementations in production, but tests inject fakes
-(`test/fixtures/fake-*`) that simulate the model writing its on-disk artifacts and
-stub the npm/Astro build, the preview+browser inspection, and the Lighthouse run.
-**Never call the real `claude -p`, shell out to npm, or launch a browser/Chrome from
-a test.** Assert on artifact *shape* and gates (valid JSON, build passes, file
+(a `SiteBuilder`), `audit`'s `RunContext.inspectSite` / `RunContext.runLighthouse`,
+and `deploy`'s `RunContext.deploySite` (a `DeployRunner`) default to the real
+implementations in production, but tests inject fakes (`test/fixtures/fake-*`)
+that simulate the model writing its on-disk artifacts and stub the npm/Astro
+build, the preview+browser inspection, the Lighthouse run, and the wrangler
+upload. **Never call the real `claude -p`, shell out to npm/wrangler, or launch a
+browser/Chrome from a test.** Assert on artifact *shape* and gates (valid JSON, build passes, file
 present), not on exact AI prose.

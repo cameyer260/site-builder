@@ -33,6 +33,7 @@ export const SiteVersionRefSchema = z.object({
   repoPath: z.string().optional(),
   remote: z.string().optional(),
 });
+export type SiteVersionRef = z.infer<typeof SiteVersionRefSchema>;
 
 export const ClientSchema = z.object({
   name: z.string().min(1),
@@ -84,6 +85,28 @@ export function writeClient(clientJsonPath: string, client: Client): void {
   const next = ClientSchema.parse({ ...client, updatedAt: nowIso() });
   mkdirSync(dirname(clientJsonPath), { recursive: true });
   writeFileSync(clientJsonPath, `${JSON.stringify(next, null, 2)}\n`);
+}
+
+/**
+ * Upserts a Site Version pointer on the Client record (ADR-0003): merges into an
+ * existing entry for the same version (preserving other fields like `repoPath` /
+ * `remote`) or appends a new one, keeping `sites` ordered by version. `deploy`
+ * uses it to record the `*.pages.dev` link; the later `--github` flow reuses it
+ * for the remote. The CRM record is never a stage output, so this survives resume.
+ */
+export function recordSiteVersion(clientJsonPath: string, ref: SiteVersionRef): Client {
+  const client = readClient(clientJsonPath);
+  if (!client) {
+    throw new UserError(`cannot record Site Version: no client.json at ${clientJsonPath}`);
+  }
+  const existing = client.sites.find((s) => s.version === ref.version);
+  const merged: SiteVersionRef = existing ? { ...existing, ...ref } : ref;
+  const sites = [...client.sites.filter((s) => s.version !== ref.version), merged].sort(
+    (a, b) => a.version - b.version,
+  );
+  const next: Client = { ...client, sites };
+  writeClient(clientJsonPath, next);
+  return next;
 }
 
 /**
