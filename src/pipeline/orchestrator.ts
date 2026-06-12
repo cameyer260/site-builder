@@ -1,5 +1,6 @@
-import { mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { relative } from "node:path";
+import { latestVersion, nextVersion } from "../storage/layout.ts";
 import {
   ensureState,
   markCompleted,
@@ -100,6 +101,83 @@ async function runFrom(ctx: RunContext, startStage: string): Promise<RunResult> 
 /** Full pipeline run for a new Client (`sb build`). */
 export async function runBuild(ctx: RunContext): Promise<RunResult> {
   return runFrom(ctx, STAGES[0]?.name as string);
+}
+
+/**
+ * Runs the Generation phase only (`generate → audit → deploy`) into the Site
+ * Version `ctx.version` (`sb variant`, ADR-0002). The Context phase is reused
+ * untouched — the caller has set `ctx.version` to a fresh number, so this is a
+ * new Site Version, never an overwrite.
+ */
+export async function runVariant(ctx: RunContext): Promise<RunResult> {
+  return runFrom(ctx, "generate");
+}
+
+/** How `smartBuild` interpreted the request — drives the CLI's summary line. */
+export type BuildKind = "new" | "refresh" | "continue" | "noop";
+
+export interface BuildOutcome extends RunResult {
+  kind: BuildKind;
+  /** The Site Version this invocation targeted. */
+  version: number;
+}
+
+/** Removes the on-disk outputs of the Context phase's work stages (ingest +
+ * synthesize) ahead of a refresh re-run, so material from since-removed Inputs
+ * does not linger. `init`'s output is empty by design (it must never clear the
+ * Client record), so the CRM facts survive. */
+function clearContextOutputs(ctx: RunContext): void {
+  for (const stage of STAGES) {
+    if (stage.phase !== "context" || stage.name === "init") {
+      continue;
+    }
+    for (const output of stage.outputs(ctx)) {
+      rmSync(output, { recursive: true, force: true });
+    }
+  }
+}
+
+/**
+ * The smart-build decision table (ADR-0008) behind `sb build`. One verb that
+ * does the least work to get from a Client's Inputs to a deployed Site:
+ *
+ * - **new** — no Client yet: create it and run the full pipeline into `v1`.
+ * - **refresh** — the Client exists and its Inputs changed (`--refresh` or
+ *   re-passed Inputs): re-run the Context phase from `ingest`, then generate a
+ *   *new* Site Version from the refreshed context (CONTEXT.md — editing the
+ *   Profile and re-running yields a new Site Version).
+ * - **continue** — the Client exists and a run is incomplete: pick up from the
+ *   first unfinished stage of the latest Site Version (resume semantics).
+ * - **noop** — everything is already complete: do nothing and let the caller
+ *   point the user at `variant`/`resume`.
+ *
+ * Mutates `ctx.version` to the Site Version it targets. Input merging happens in
+ * the command before this is called, so `refresh` already folds in re-passed
+ * Inputs.
+ */
+export async function smartBuild(
+  ctx: RunContext,
+  opts: { refresh: boolean },
+): Promise<BuildOutcome> {
+  if (!existsSync(ctx.paths.clientJson)) {
+    ctx.version = 1;
+    return { ...(await runBuild(ctx)), kind: "new", version: 1 };
+  }
+
+  if (opts.refresh) {
+    const version = nextVersion(ctx.paths.sites);
+    ctx.version = version;
+    clearContextOutputs(ctx);
+    ctx.log.step(`build: refreshing context, then generating Site v${version}`);
+    return { ...(await runFrom(ctx, "ingest")), kind: "refresh", version };
+  }
+
+  const version = latestVersion(ctx.paths.sites) ?? 1;
+  ctx.version = version;
+  if (!findResumeStage(ctx)) {
+    return { ok: true, ran: [], kind: "noop", version };
+  }
+  return { ...(await resumePipeline(ctx)), kind: "continue", version };
 }
 
 /**

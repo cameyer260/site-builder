@@ -1,14 +1,15 @@
 import { parseArgs } from "node:util";
 import pc from "picocolors";
 import { loadConfigOrThrow } from "../config/store.ts";
-import { runBuild } from "../pipeline/orchestrator.ts";
+import { runPush } from "../github/push.ts";
+import { smartBuild } from "../pipeline/orchestrator.ts";
 import { buildRunContext } from "../runtime.ts";
-import { type ClientInputs, ClientInputsSchema } from "../storage/client.ts";
-import { clientExists } from "../storage/layout.ts";
+import { type ClientInputs, ClientInputsSchema, mergeClientInputs } from "../storage/client.ts";
+import { clientExists, clientPaths } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 
 const USAGE =
-  "usage: sb build <client> [--url <url>] [--docs <path>…] [--images <path>…] [--notes <text>] [--pages <n>] [--vibe <text>] [--style <text>] [--yes]";
+  "usage: sb build <client> [--url <url>] [--docs <path>…] [--images <path>…] [--notes <text>] [--pages <n>] [--vibe <text>] [--style <text>] [--refresh] [--github] [--yes]";
 
 /** Flattens repeated and comma-separated list flags into a clean string[]. */
 function splitList(values: string[] | undefined): string[] {
@@ -30,6 +31,8 @@ export async function buildCommand(args: string[]): Promise<number> {
       pages: { type: "string" },
       vibe: { type: "string" },
       style: { type: "string" },
+      refresh: { type: "boolean" },
+      github: { type: "boolean" },
       yes: { type: "boolean", short: "y" },
     },
   });
@@ -45,16 +48,21 @@ export async function buildCommand(args: string[]): Promise<number> {
     images: splitList(values.images),
     notes: values.notes,
   });
-
-  // At least one Input is required to run a Client (CONTEXT.md > Input).
-  const hasInput =
+  const hasNewInputs =
     Boolean(inputs.url) ||
     inputs.docs.length > 0 ||
     inputs.images.length > 0 ||
     Boolean(inputs.notes);
-  if (!hasInput) {
+
+  const config = loadConfigOrThrow();
+  const exists = clientExists(config.root, name);
+
+  // At least one Input is required only to create a *new* Client (CONTEXT.md >
+  // Input). An existing Client already has its Inputs on record, so a bare
+  // `sb build`/`--refresh` re-uses them.
+  if (!exists && !hasNewInputs) {
     throw new UserError(
-      "at least one Input is required",
+      "at least one Input is required for a new Client",
       "pass --url, --docs, --images, or --notes",
     );
   }
@@ -67,15 +75,13 @@ export async function buildCommand(args: string[]): Promise<number> {
     }
   }
 
-  const config = loadConfigOrThrow();
-
-  // Uniqueness guard: build is for new Clients only (ADR-0002).
-  if (clientExists(config.root, name)) {
-    throw new UserError(
-      `a Client already exists for "${name}"`,
-      `use \`sb resume ${name}\` to continue, or \`sb variant\` for a new Site Version`,
-    );
+  // Re-passing Inputs to an existing Client both folds them into the record and
+  // triggers a context refresh (ADR-0008). `--refresh` forces it with no new
+  // Inputs (re-crawl the same ones).
+  if (exists && hasNewInputs) {
+    mergeClientInputs(clientPaths(config.root, name).clientJson, inputs);
   }
+  const refresh = Boolean(values.refresh) || hasNewInputs;
 
   // The QA gate prompts only on a real terminal and when not waved through with --yes.
   const interactive = Boolean(process.stdin.isTTY) && !values.yes;
@@ -83,7 +89,7 @@ export async function buildCommand(args: string[]): Promise<number> {
   const ctx = buildRunContext({
     config,
     name,
-    version: 1,
+    version: 1, // smartBuild sets the real target version.
     command: "build",
     inputs,
     pageCap,
@@ -93,16 +99,31 @@ export async function buildCommand(args: string[]): Promise<number> {
   });
   ctx.log.step(`building Client "${name}" at ${ctx.paths.dir}`);
 
-  const result = await runBuild(ctx);
-  if (result.ok) {
-    ctx.log.success(`build complete — ran ${result.ran.join(" → ")}`);
+  const result = await smartBuild(ctx, { refresh: exists && refresh });
+
+  if (!result.ok) {
+    console.error(
+      pc.dim(
+        `run \`sb resume ${name}\` to retry from "${result.failedStage}", or \`sb status ${name}\` to inspect`,
+      ),
+    );
+    return 1;
+  }
+
+  if (result.kind === "noop") {
+    ctx.log.success(`nothing to build — Site v${result.version} is already complete`);
+    console.error(
+      pc.dim(
+        `use \`sb variant ${name}\` for a new take, or pass new Inputs / \`--refresh\` to rebuild`,
+      ),
+    );
     return 0;
   }
 
-  console.error(
-    pc.dim(
-      `run \`sb resume ${name}\` to retry from "${result.failedStage}", or \`sb status ${name}\` to inspect`,
-    ),
-  );
-  return 1;
+  ctx.log.success(`build complete — ran ${result.ran.join(" → ")}`);
+
+  if (values.github) {
+    await runPush({ paths: ctx.paths, version: result.version, ghBin: config.ghBin, log: ctx.log });
+  }
+  return 0;
 }

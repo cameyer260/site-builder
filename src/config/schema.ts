@@ -27,6 +27,11 @@ export const ConfigSchema = z.object({
   engineBin: z.string().min(1),
   /** The Cloudflare deploy binary. */
   wranglerBin: z.string().min(1),
+  /**
+   * The GitHub CLI binary, used only by the opt-in `--github`/`sb push` flow
+   * (ADR-0004). Defaulted so configs written before Phase 8 still load.
+   */
+  ghBin: z.string().min(1).default("gh"),
   /** Optional Pexels API key for tier-2 stock imagery during generate. */
   pexelsApiKey: z.string().optional(),
   viewports: ViewportsSchema,
@@ -40,6 +45,7 @@ export type Config = z.infer<typeof ConfigSchema>;
 export const DEFAULTS = {
   engineBin: "claudey",
   wranglerBin: "wrangler",
+  ghBin: "gh",
   viewports: { desktop: 1440, mobile: 390 },
   pageCap: 10,
   models: {

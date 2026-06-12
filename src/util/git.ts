@@ -28,3 +28,17 @@ export function gitInit(cwd: string): boolean {
 export function commitAll(cwd: string, message: string): boolean {
   return git(cwd, "add", "-A") && git(cwd, ...GIT_IDENT, "commit", "-q", "-m", message);
 }
+
+/**
+ * The `origin` remote URL of the repo at `cwd`, or null when there is none (or
+ * git is unavailable). Used after `sb push` to record the authoritative remote
+ * rather than scraping it from the GitHub CLI's output.
+ */
+export function remoteUrl(cwd: string): string | null {
+  const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd, encoding: "utf8" });
+  if (r.status !== 0) {
+    return null;
+  }
+  const url = (r.stdout ?? "").trim();
+  return url.length > 0 ? url : null;
+}

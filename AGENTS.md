@@ -19,7 +19,8 @@ AI-heavy stages.
   cite them as `ADR-000N`; read the ADR before changing anything that cites it.
   The big ones: 0001 (engine), 0002 (pipeline/resume), 0003 (storage/state),
   0004 (deploy), 0005 (Kit), 0006 (design intelligence), 0007 (audit:
-  Lighthouse as evidence, not a gate).
+  Lighthouse as evidence, not a gate), 0008 (smart-build decision table +
+  CRM/GitHub continuation operations).
 - **`docs/build-plan.md`** — phase order (0–9) and milestones. **`docs/roadmap.md`**
   — what is *explicitly out of scope for v1*; don't build these without being asked.
 - **`NOTES.md`** — current open TODOs.
@@ -129,6 +130,19 @@ Profile — `ingest`'s crawl, `audit`'s inspection), `src/util/git.ts`
 (per–Site-Version commits for `generate` and `audit`), and `runCommand` in
 `src/astro/run.ts` (the generic spawn/capture `deploy` reuses for wrangler).
 Improving these or the Kit raises the floor for every Site at once.
+
+**Continuation, CRM & GitHub** (`src/commands/*`, `src/github/`, ADR-0008). Three
+pipeline verbs stay distinct: `build` is smart (`smartBuild` in the orchestrator
+picks **new / refresh / continue / noop** from on-disk state — refresh forks a new
+Site Version, continue resumes the latest in place), `resume` strictly continues a
+failed run, `variant` forks a new Site Version from the existing context without
+re-crawling. CRM commands (`list`/`show`/`set`/`edit`, plus `status`) are thin
+reads/writes over `<slug>/client.json` (the Root is the registry); `set`/`edit`
+touch only the CRM facts, never `state.json`. GitHub is opt-in and orthogonal to
+deploy (ADR-0004): `--github` / `sb push` runs `gh repo create … --push` from a
+Site Version's git repo and records the remote via `recordSiteVersion`, behind the
+injectable `GitHubPublisher` seam so tests never shell out. `gh` is a non-required
+`config doctor` check.
 
 ## Testing posture
 

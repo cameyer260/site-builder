@@ -110,6 +110,90 @@ export function recordSiteVersion(clientJsonPath: string, ref: SiteVersionRef): 
 }
 
 /**
+ * Folds freshly passed Inputs into an existing Client's record (the `sb build
+ * --refresh` / re-passed-inputs path, ADR-0002/0008). Scalar Inputs (`url`,
+ * `notes`) override when provided; list Inputs (`docs`, `images`) union without
+ * duplicates. Passing no new Inputs is a no-op — a bare `--refresh` re-crawls the
+ * Client's existing Inputs. Returns the merged Client.
+ */
+export function mergeClientInputs(clientJsonPath: string, incoming: ClientInputs): Client {
+  const client = readClient(clientJsonPath);
+  if (!client) {
+    throw new UserError(`cannot merge Inputs: no client.json at ${clientJsonPath}`);
+  }
+  const union = (existing: string[], next: string[]): string[] => [
+    ...existing,
+    ...next.filter((v) => !existing.includes(v)),
+  ];
+  const inputs: ClientInputs = {
+    url: incoming.url ?? client.inputs.url,
+    notes: incoming.notes ?? client.inputs.notes,
+    docs: union(client.inputs.docs, incoming.docs),
+    images: union(client.inputs.images, incoming.images),
+  };
+  const next: Client = { ...client, inputs };
+  writeClient(clientJsonPath, next);
+  return next;
+}
+
+/**
+ * The CRM fields `sb set` may write on `client.json` (ADR-0003 — facts split
+ * from machine state). Dotted keys mirror the schema; arrays (`socials`,
+ * `reviews`, `docs`, `images`) are left to `sb edit`. `url` and `notes` map onto
+ * the Input record. Every write is re-validated by {@link writeClient}.
+ */
+export const CLIENT_FIELD_KEYS = [
+  "name",
+  "contact.name",
+  "contact.email",
+  "contact.phone",
+  "notes",
+  "url",
+] as const;
+export type ClientFieldKey = (typeof CLIENT_FIELD_KEYS)[number];
+
+export function isClientFieldKey(key: string): key is ClientFieldKey {
+  return (CLIENT_FIELD_KEYS as readonly string[]).includes(key);
+}
+
+/** Sets one scalar CRM field on the Client record and persists it. */
+export function setClientField(clientJsonPath: string, key: string, value: string): Client {
+  if (!isClientFieldKey(key)) {
+    throw new UserError(
+      `unknown client field: ${key}`,
+      `settable fields: ${CLIENT_FIELD_KEYS.join(", ")} (edit arrays with \`sb edit\`)`,
+    );
+  }
+  const client = readClient(clientJsonPath);
+  if (!client) {
+    throw new UserError(`no client.json at ${clientJsonPath}`);
+  }
+  const next: Client = structuredClone(client);
+  switch (key) {
+    case "name":
+      next.name = value;
+      break;
+    case "contact.name":
+      next.contact.name = value;
+      break;
+    case "contact.email":
+      next.contact.email = value;
+      break;
+    case "contact.phone":
+      next.contact.phone = value;
+      break;
+    case "notes":
+      next.notes = value;
+      break;
+    case "url":
+      next.inputs.url = value;
+      break;
+  }
+  writeClient(clientJsonPath, next);
+  return next;
+}
+
+/**
  * Uniqueness guard: refuses to create a Client when one already exists at the
  * slug. `build` is for new Clients; continuing an existing one uses
  * `resume`/`variant` (ADR-0002).

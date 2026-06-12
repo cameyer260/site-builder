@@ -69,6 +69,7 @@ const KEY_KINDS = {
   root: "string",
   engineBin: "string",
   wranglerBin: "string",
+  ghBin: "string",
   pexelsApiKey: "string",
   "viewports.desktop": "number",
   "viewports.mobile": "number",

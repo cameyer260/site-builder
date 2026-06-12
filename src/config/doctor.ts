@@ -69,6 +69,30 @@ function checkRoot(root: string): CheckResult {
   }
 }
 
+/**
+ * GitHub CLI for the opt-in `--github`/`sb push` flow (ADR-0004). Non-required:
+ * the core promise (a live link) comes from deploy alone, so a missing/unauthed
+ * `gh` only warns. When present, `gh auth status` is cheap and worth probing.
+ */
+function checkGitHub(bin: string): CheckResult {
+  if (!binaryPresent(bin)) {
+    return {
+      name: `github cli (${bin})`,
+      ok: false,
+      required: false,
+      detail: "not found — `--github`/`sb push` will be unavailable",
+    };
+  }
+  const r = spawnSync(bin, ["auth", "status"], { encoding: "utf8" });
+  const authed = r.status === 0;
+  return {
+    name: "github cli auth",
+    ok: authed,
+    required: false,
+    detail: authed ? "authenticated" : "present but not authenticated — run `gh auth login`",
+  };
+}
+
 function checkPexels(key: string | undefined): CheckResult {
   const present = Boolean(key && key.length > 0);
   return {
@@ -85,6 +109,7 @@ export function runDoctor(cfg: Config): CheckResult[] {
     checkWranglerPresent(cfg.wranglerBin),
     checkWranglerAuth(cfg.wranglerBin),
     checkRoot(cfg.root),
+    checkGitHub(cfg.ghBin),
     checkPexels(cfg.pexelsApiKey),
   ];
 }

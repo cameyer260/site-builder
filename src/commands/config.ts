@@ -96,6 +96,8 @@ async function interactiveSetup(): Promise<number> {
     root: resolvedRoot,
     engineBin: engineBin.trim() || DEFAULTS.engineBin,
     wranglerBin: wranglerBin.trim() || DEFAULTS.wranglerBin,
+    // gh is only needed for the opt-in --github flow; carry it without prompting.
+    ghBin: existing?.ghBin ?? DEFAULTS.ghBin,
     pexelsApiKey: pexels.trim() || undefined,
     viewports: existing?.viewports ?? DEFAULTS.viewports,
     pageCap: existing?.pageCap ?? DEFAULTS.pageCap,
