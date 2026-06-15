@@ -1,6 +1,5 @@
-import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { buildSite, type SiteBuilder } from "../astro/run.ts";
+import { buildSite, ensureBuiltDist, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
 import { recordSiteVersion } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
@@ -41,7 +40,13 @@ export async function runDeploy(params: DeployParams): Promise<string> {
 
   // 1. Ensure there is a built dist to upload (kept from audit on a normal run;
   //    rebuilt here if a standalone resume at deploy lost it).
-  await ensureBuilt(versionDir, distDir, compile, log);
+  await ensureBuiltDist({
+    versionDir,
+    compile,
+    log,
+    buildingMessage: "deploy: building Site before upload (no dist found)",
+    failureMessage: "deploy: astro build failed — nothing to upload",
+  });
 
   // 2. Direct Upload to Cloudflare Pages (ADR-0004).
   const projectName = pagesProjectName(paths.slug);
@@ -66,24 +71,4 @@ export async function runDeploy(params: DeployParams): Promise<string> {
   recordSiteVersion(paths.clientJson, { version, deployUrl: result.url });
   log.success(`deploy: published Site v${version} → ${result.url}`);
   return result.url;
-}
-
-/** Builds the Site if no `dist/` is present, so there is something to upload. */
-async function ensureBuilt(
-  versionDir: string,
-  distDir: string,
-  compile: SiteBuilder,
-  log: Logger,
-): Promise<void> {
-  if (existsSync(join(distDir, "index.html"))) {
-    return;
-  }
-  log.step("deploy: building Site before upload (no dist found)");
-  const built = await compile(versionDir, log);
-  if (!built.ok) {
-    throw new UserError(
-      "deploy: astro build failed — nothing to upload",
-      built.output.trim().slice(-1500),
-    );
-  }
 }

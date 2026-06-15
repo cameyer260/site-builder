@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { formatZodError } from "../config/schema.ts";
-import { UserError } from "../util/errors.ts";
+import { readJsonFile } from "../util/json.ts";
+import { nowIso } from "../util/time.ts";
 
 /**
  * `state.json` — machine-managed pipeline state (ADR-0003). Never hand-edited.
@@ -42,10 +42,6 @@ export const StateSchema = z.object({
 });
 export type State = z.infer<typeof StateSchema>;
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 export function emptyState(
   phase: z.infer<typeof PhaseSchema>,
   stageNames: string[],
@@ -63,17 +59,7 @@ export function readState(statePath: string): State | null {
   if (!existsSync(statePath)) {
     return null;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(statePath, "utf8"));
-  } catch {
-    throw new UserError(`state.json at ${statePath} is not valid JSON`);
-  }
-  const parsed = StateSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new UserError(`state.json at ${statePath} is invalid: ${formatZodError(parsed.error)}`);
-  }
-  return parsed.data;
+  return readJsonFile(statePath, StateSchema, { label: `state.json at ${statePath}` });
 }
 
 export function writeState(statePath: string, state: State): void {

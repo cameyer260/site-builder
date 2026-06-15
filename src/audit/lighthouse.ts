@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { withPreview } from "../astro/preview.ts";
 import type { Logger } from "../util/log.ts";
+import { nowIso } from "../util/time.ts";
 
 /**
  * The **Scorecard** (CONTEXT.md, ADR-0007): after `audit`'s single fix pass +
@@ -120,7 +121,7 @@ export const runLighthouseScorecard: LighthouseRunner = ({ siteDir, log }) => {
       } finally {
         chrome.kill();
       }
-      return { url, generatedAt: new Date().toISOString(), results };
+      return { url, generatedAt: nowIso(), results };
     },
     log,
   );

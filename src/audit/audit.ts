@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildSite, type SiteBuilder } from "../astro/run.ts";
+import { buildSite, ensureBuiltDist, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
 import { type EngineRunner, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
@@ -10,6 +10,7 @@ import type { ClientPaths } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 import { commitAll } from "../util/git.ts";
 import type { Logger } from "../util/log.ts";
+import { nowIso } from "../util/time.ts";
 import { type InspectResult, inspectBuiltSite, type SiteInspector } from "./inspect.ts";
 import {
   type LighthouseRunner,
@@ -67,7 +68,13 @@ export async function runAudit(params: AuditParams): Promise<void> {
 
   // 1. Ensure the generated Site is built so it can be served (kept from generate
   //    on a normal run; rebuilt here if a standalone resume lost the dist).
-  await ensureBuilt(versionDir, compile, log);
+  await ensureBuiltDist({
+    versionDir,
+    compile,
+    log,
+    buildingMessage: "audit: building Site before preview (no dist found)",
+    failureMessage: "audit: astro build failed — cannot preview the Site",
+  });
 
   // 2. Deterministic inspection → audit/checks.json + audit/screenshots/.
   log.step("audit: inspecting built Site (screenshots, a11y, links)");
@@ -129,26 +136,11 @@ export async function runAudit(params: AuditParams): Promise<void> {
   log.success(`audit: reviewed Site v${version}`);
 }
 
-/** Builds the Site if no `dist/` is present, so the preview server has something to serve. */
-async function ensureBuilt(versionDir: string, compile: SiteBuilder, log: Logger): Promise<void> {
-  if (existsSync(join(versionDir, "dist", "index.html"))) {
-    return;
-  }
-  log.step("audit: building Site before preview (no dist found)");
-  const built = await compile(versionDir, log);
-  if (!built.ok) {
-    throw new UserError(
-      "audit: astro build failed — cannot preview the Site",
-      built.output.trim().slice(-1500),
-    );
-  }
-}
-
 /** Persists the deterministic findings as `audit/checks.json`. */
 function writeChecks(path: string, inspection: InspectResult): void {
   const a11yViolations = inspection.axe.reduce((n, page) => n + page.violations.length, 0);
   const payload = {
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     summary: {
       pages: inspection.pages.length,
       a11yViolations,

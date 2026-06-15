@@ -1,7 +1,8 @@
 import type { Browser } from "playwright";
-import { DEFAULT_USER_AGENT } from "../playwright/browser.ts";
 import { captureScreens, type ViewportProfile } from "../playwright/screenshot.ts";
+import { walkSite } from "../playwright/walk.ts";
 import type { Logger } from "../util/log.ts";
+import { uniqueName } from "../util/names.ts";
 import type { AssetSource } from "./assets.ts";
 import { htmlToMarkdown } from "./markdown.ts";
 import { isPageWorthy, normalizeUrl, pageSlug, sameOrigin } from "./url.ts";
@@ -103,52 +104,29 @@ export async function crawlSite(
   pageCap: number,
   log: Logger,
 ): Promise<CrawlResult> {
-  const primary = profiles[0];
-  const context = await browser.newContext({
-    viewport: primary
-      ? { width: primary.width, height: primary.height }
-      : { width: 1440, height: 900 },
-    deviceScaleFactor: 1,
-    userAgent: DEFAULT_USER_AGENT,
-  });
-  const page = await context.newPage();
-  page.setDefaultTimeout(NAV_TIMEOUT_MS);
-
   const sitemapUrls = await discoverFromSitemap(baseUrl, pageCap);
   const usingSitemap = sitemapUrls.length > 0;
-  const queue: string[] = usingSitemap ? sitemapUrls : [normalizeUrl(baseUrl, baseUrl) ?? baseUrl];
+  const seed = usingSitemap ? sitemapUrls : [normalizeUrl(baseUrl, baseUrl) ?? baseUrl];
 
-  const visited = new Set<string>();
   const usedSlugs = new Set<string>();
   const pages: CrawledPage[] = [];
 
-  try {
-    while (queue.length > 0 && pages.length < pageCap) {
-      const url = queue.shift() as string;
-      if (visited.has(url)) {
-        continue;
-      }
-      visited.add(url);
-
-      try {
-        await page.goto(url, { waitUntil: "load", timeout: NAV_TIMEOUT_MS });
-      } catch {
-        log.warn(`ingest: could not load ${url}`);
-        continue;
-      }
-      await page.waitForTimeout(300);
-
+  await walkSite({
+    browser,
+    baseUrl,
+    profiles,
+    seed,
+    pageCap,
+    navTimeoutMs: NAV_TIMEOUT_MS,
+    settleMs: 300,
+    onLoadError: (url) => log.warn(`ingest: could not load ${url}`),
+    visit: async ({ page, url }) => {
       const finalUrl = page.url();
       const title = await page.title();
       const markdown = htmlToMarkdown(await page.content());
       const assets = await collectAssets(page, finalUrl);
 
-      let slug = pageSlug(url);
-      let suffix = 1;
-      while (usedSlugs.has(slug)) {
-        slug = `${pageSlug(url)}-${suffix++}`;
-      }
-      usedSlugs.add(slug);
+      const slug = uniqueName(pageSlug(url), usedSlugs);
 
       const screenshots = await captureScreens(page, {
         profiles,
@@ -158,26 +136,18 @@ export async function crawlSite(
       pages.push({ url, slug, title, markdown, screenshots, assets });
       log.step(`ingest: captured ${url} (${assets.length} asset ref(s))`);
 
-      if (!usingSitemap) {
-        for (const href of await page.$$eval("a[href]", (els) =>
-          els.map((el) => (el as HTMLAnchorElement).href),
-        )) {
-          const normalized = normalizeUrl(href, finalUrl);
-          if (
-            normalized &&
-            sameOrigin(normalized, baseUrl) &&
-            isPageWorthy(normalized) &&
-            !visited.has(normalized) &&
-            !queue.includes(normalized)
-          ) {
-            queue.push(normalized);
-          }
-        }
+      // Sitemap-discovered crawls don't follow links; link-BFS crawls do.
+      if (usingSitemap) {
+        return [];
       }
-    }
-  } finally {
-    await context.close();
-  }
+      const hrefs = await page.$$eval("a[href]", (els) =>
+        els.map((el) => (el as HTMLAnchorElement).href),
+      );
+      return hrefs
+        .map((href) => normalizeUrl(href, finalUrl))
+        .filter((u): u is string => u !== null);
+    },
+  });
 
   const discovery: CrawlResult["discovery"] = usingSitemap
     ? "sitemap"

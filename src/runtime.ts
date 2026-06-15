@@ -5,6 +5,7 @@ import type { RunContext } from "./pipeline/types.ts";
 import type { ClientInputs } from "./storage/client.ts";
 import { clientPaths } from "./storage/layout.ts";
 import { createLogger } from "./util/log.ts";
+import { nowIso } from "./util/time.ts";
 
 /**
  * Assembles a RunContext for a command invocation: resolves the Client's paths,
@@ -26,7 +27,7 @@ export function buildRunContext(opts: {
   mkdirSync(paths.dir, { recursive: true });
   mkdirSync(paths.logs, { recursive: true });
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const stamp = nowIso().replace(/[:.]/g, "-");
   const log = createLogger({ file: join(paths.logs, `${stamp}-${opts.command}.log`) });
 
   return {

@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { formatZodError } from "../config/schema.ts";
 import { UserError } from "../util/errors.ts";
+import { formatZodError } from "../util/zod.ts";
 
 /**
  * `ingest/manifest.json` — the structured, inspectable index of everything

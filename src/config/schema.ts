@@ -55,7 +55,3 @@ export const DEFAULTS = {
     assetClassification: "claude-sonnet-4-6",
   },
 } satisfies Omit<Config, "root" | "pexelsApiKey">;
-
-export function formatZodError(err: z.ZodError): string {
-  return err.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
-}

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { UserError } from "../util/errors.ts";
 import type { Logger } from "../util/log.ts";
 
 /**
@@ -117,3 +118,34 @@ export async function buildSite(siteDir: string, log?: Logger): Promise<CommandR
 
 /** The injectable shape `generate` accepts so tests can stub the compile gate. */
 export type SiteBuilder = (siteDir: string, log?: Logger) => Promise<CommandResult>;
+
+export interface EnsureBuiltDistParams {
+  versionDir: string;
+  /** The compile gate (the injected `buildSite`). */
+  compile: SiteBuilder;
+  log: Logger;
+  /** Logged (as a step) when no dist is found and a build is kicked off. */
+  buildingMessage: string;
+  /** The UserError message when that build fails. */
+  failureMessage: string;
+}
+
+/**
+ * Ensures the Site Version at `versionDir` has a built `dist/index.html`,
+ * compiling it via `compile` when absent. Shared by `audit` (so the preview
+ * server has something to serve) and `deploy` (so there is something to upload):
+ * a normal pipeline run keeps generate's/audit's dist, so this only rebuilds on a
+ * standalone resume that lost it. Throws a {@link UserError} carrying the build
+ * output tail with the caller's `failureMessage` when the build fails.
+ */
+export async function ensureBuiltDist(params: EnsureBuiltDistParams): Promise<void> {
+  const { versionDir, compile, log, buildingMessage, failureMessage } = params;
+  if (existsSync(join(versionDir, "dist", "index.html"))) {
+    return;
+  }
+  log.step(buildingMessage);
+  const built = await compile(versionDir, log);
+  if (!built.ok) {
+    throw new UserError(failureMessage, built.output.trim().slice(-1500));
+  }
+}

@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { formatZodError } from "../config/schema.ts";
 import { UserError } from "../util/errors.ts";
+import { readJsonFile } from "../util/json.ts";
 import { CHECKLIST } from "./checklist.ts";
 
 /**
@@ -107,20 +107,11 @@ export function readProfile(path: string): Profile {
   if (!existsSync(path)) {
     throw new UserError(`synthesize: expected profile.json at ${path}, but it was not written`);
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(path, "utf8"));
-  } catch {
-    throw new UserError(`synthesize: profile.json at ${path} is not valid JSON`);
-  }
-  const parsed = ProfileSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new UserError(
-      `synthesize: profile.json at ${path} is invalid: ${formatZodError(parsed.error)}`,
-    );
-  }
-  assertChecklistCoverage(path, parsed.data.fields);
-  return parsed.data;
+  const profile = readJsonFile(path, ProfileSchema, {
+    label: `synthesize: profile.json at ${path}`,
+  });
+  assertChecklistCoverage(path, profile.fields);
+  return profile;
 }
 
 export function writeProfile(path: string, profile: Profile): void {

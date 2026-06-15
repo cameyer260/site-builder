@@ -10,6 +10,7 @@ import type { Profile } from "../synthesize/profile.ts";
 import { UserError } from "../util/errors.ts";
 import { commitAll } from "../util/git.ts";
 import type { Logger } from "../util/log.ts";
+import { nowIso } from "../util/time.ts";
 import { deriveBrief } from "./brief.ts";
 import { copyKitInto, gitInitBaseline } from "./kit.ts";
 import { readImagesManifest, resolveImages } from "./pexels.ts";
@@ -135,7 +136,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
   if (commitAll(versionDir, "feat: generated site")) {
     log.step("generate: committed generated Site");
   }
-  writeFileSync(join(versionDir, ".generated"), `${new Date().toISOString()}\n`);
+  writeFileSync(join(versionDir, ".generated"), `${nowIso()}\n`);
   log.success(`generate: built Site v${version}`);
 }
 

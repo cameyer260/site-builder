@@ -20,7 +20,9 @@ AI-heavy stages.
   The big ones: 0001 (engine), 0002 (pipeline/resume), 0003 (storage/state),
   0004 (deploy), 0005 (Kit), 0006 (design intelligence), 0007 (audit:
   Lighthouse as evidence, not a gate), 0008 (smart-build decision table +
-  CRM/GitHub continuation operations).
+  CRM/GitHub continuation operations), 0009 (idiomatic functional TS over
+  literal OO-SOLID — cleanups are DRY/consistency behind a frozen behavioral
+  contract, not re-architecture).
 - **`docs/build-plan.md`** — phase order (0–9) and milestones. **`docs/roadmap.md`**
   — what is *explicitly out of scope for v1*; don't build these without being asked.
 - **`NOTES.md`** — current open TODOs.

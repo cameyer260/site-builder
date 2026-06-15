@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { formatZodError } from "../config/schema.ts";
 import { UserError } from "../util/errors.ts";
+import { readJsonFile } from "../util/json.ts";
+import { nowIso } from "../util/time.ts";
 import type { ClientPaths } from "./layout.ts";
 
 /**
@@ -48,10 +49,6 @@ export const ClientSchema = z.object({
 });
 export type Client = z.infer<typeof ClientSchema>;
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 export function newClient(name: string, inputs: ClientInputs): Client {
   const ts = nowIso();
   return ClientSchema.parse({
@@ -66,19 +63,9 @@ export function readClient(clientJsonPath: string): Client | null {
   if (!existsSync(clientJsonPath)) {
     return null;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(clientJsonPath, "utf8"));
-  } catch {
-    throw new UserError(`client.json at ${clientJsonPath} is not valid JSON`);
-  }
-  const parsed = ClientSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new UserError(
-      `client.json at ${clientJsonPath} is invalid: ${formatZodError(parsed.error)}`,
-    );
-  }
-  return parsed.data;
+  return readJsonFile(clientJsonPath, ClientSchema, {
+    label: `client.json at ${clientJsonPath}`,
+  });
 }
 
 export function writeClient(clientJsonPath: string, client: Client): void {

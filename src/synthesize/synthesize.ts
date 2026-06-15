@@ -8,6 +8,7 @@ import type { Client } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 import type { Logger } from "../util/log.ts";
+import { nowIso } from "../util/time.ts";
 import {
   type AssetClassification,
   candidateAssets,
@@ -136,12 +137,21 @@ function finalizeProfile(
   }
 
   profile.client = clientName;
-  profile.generatedAt = new Date().toISOString();
+  profile.generatedAt = nowIso();
   profile.assets = assets;
-  writeProfile(profilePath, profile);
-
-  writeFileSync(join(contextDir, "checklist.md"), renderChecklistGaps(profile));
+  persistProfile(contextDir, profile);
   return profile;
+}
+
+/**
+ * Persists a resolved Profile's machine artifacts to `context/`: the JSON sidecar
+ * (`profile.json`) and the re-derived Checklist gaps (`checklist.md`), written
+ * together so the gaps always match the recorded Field statuses. Shared by
+ * `synthesize` (finalize) and the QA session (which then appends to `profile.md`).
+ */
+export function persistProfile(contextDir: string, profile: Profile): void {
+  writeProfile(join(contextDir, "profile.json"), profile);
+  writeFileSync(join(contextDir, "checklist.md"), renderChecklistGaps(profile));
 }
 
 /** The "what we still need to know" Checklist: every non-Known field. */

@@ -3,9 +3,11 @@ import axe from "axe-core";
 import type { Browser, Page } from "playwright";
 import { withPreview } from "../astro/preview.ts";
 import { isPageWorthy, normalizeUrl, pageSlug, sameOrigin } from "../ingest/url.ts";
-import { DEFAULT_USER_AGENT, withBrowser } from "../playwright/browser.ts";
+import { withBrowser } from "../playwright/browser.ts";
 import { captureScreens, type ViewportProfile } from "../playwright/screenshot.ts";
+import { walkSite } from "../playwright/walk.ts";
 import type { Logger } from "../util/log.ts";
+import { uniqueName } from "../util/names.ts";
 
 /**
  * The deterministic fix-drivers `audit` feeds into the AI review (CONTEXT.md >
@@ -82,71 +84,52 @@ export const inspectBuiltSite: SiteInspector = (params) => {
   return withPreview(params.siteDir, (preview) => browseAndScan(preview.url, params), params.log);
 };
 
-async function browseAndScan(baseUrl: string, params: InspectParams): Promise<InspectResult> {
+/**
+ * The browser half of the inspector: a bounded same-origin crawl from `baseUrl`
+ * that runs axe-core, collects references, and screenshots each page. Exported so
+ * the real-Chromium inspect test can drive it against a `Bun.serve` fixture
+ * without standing up an `astro preview`.
+ */
+export async function browseAndScan(
+  baseUrl: string,
+  params: InspectParams,
+): Promise<InspectResult> {
   const { profiles, auditDir, pageCap, log } = params;
   const screenshotsDir = join(auditDir, "screenshots");
-  const primary = profiles[0];
+  const start = normalizeUrl(baseUrl, baseUrl) ?? baseUrl;
+
+  const usedSlugs = new Set<string>();
+  const pages: InspectedPage[] = [];
+  const axeResults: PageAxe[] = [];
+  /** Unique references collected across pages, with where each was first seen. */
+  const refs = new Map<string, { kind: "page" | "asset"; foundOn: string }>();
 
   return withBrowser(async (browser: Browser) => {
-    const context = await browser.newContext({
-      viewport: primary
-        ? { width: primary.width, height: primary.height }
-        : { width: 1440, height: 900 },
-      deviceScaleFactor: 1,
-      userAgent: DEFAULT_USER_AGENT,
-    });
-    const page = await context.newPage();
-    page.setDefaultTimeout(NAV_TIMEOUT_MS);
-
-    const start = normalizeUrl(baseUrl, baseUrl) ?? baseUrl;
-    const queue: string[] = [start];
-    const visited = new Set<string>();
-    const usedSlugs = new Set<string>();
-    const pages: InspectedPage[] = [];
-    const axeResults: PageAxe[] = [];
-    /** Unique references collected across pages, with where each was first seen. */
-    const refs = new Map<string, { kind: "page" | "asset"; foundOn: string }>();
-
-    try {
-      while (queue.length > 0 && pages.length < pageCap) {
-        const url = queue.shift() as string;
-        if (visited.has(url)) {
-          continue;
-        }
-        visited.add(url);
-
-        try {
-          await page.goto(url, { waitUntil: "load", timeout: NAV_TIMEOUT_MS });
-        } catch {
-          log.warn(`audit: could not load ${url}`);
-          continue;
-        }
-        await page.waitForTimeout(200);
-
-        let slug = pageSlug(url);
-        let suffix = 1;
-        while (usedSlugs.has(slug)) {
-          slug = `${pageSlug(url)}-${suffix++}`;
-        }
-        usedSlugs.add(slug);
+    await walkSite({
+      browser,
+      baseUrl,
+      profiles,
+      seed: [start],
+      pageCap,
+      navTimeoutMs: NAV_TIMEOUT_MS,
+      settleMs: 200,
+      onLoadError: (url) => log.warn(`audit: could not load ${url}`),
+      visit: async ({ page, url }) => {
+        const slug = uniqueName(pageSlug(url), usedSlugs);
 
         // Accessibility scan at the primary (desktop) viewport, before screenshots
         // resize the page.
         const violations = await runAxe(page);
         axeResults.push({ url, slug, violations });
 
-        // Collect links/assets; enqueue same-origin pages for the bounded crawl.
+        // Collect links/assets; same-origin pages are returned for the bounded crawl.
+        const next: string[] = [];
         for (const ref of await collectRefs(page, url)) {
           if (!refs.has(ref.url)) {
             refs.set(ref.url, { kind: ref.kind, foundOn: url });
           }
-          if (
-            ref.kind === "page" &&
-            sameOrigin(ref.url, baseUrl) &&
-            !visited.has(ref.url) &&
-            !queue.includes(ref.url)
-          ) {
-            queue.push(ref.url);
+          if (ref.kind === "page") {
+            next.push(ref.url);
           }
         }
 
@@ -157,10 +140,9 @@ async function browseAndScan(baseUrl: string, params: InspectParams): Promise<In
         });
         pages.push({ url, slug, screenshots: relativize(screenshots, auditDir) });
         log.step(`audit: inspected ${url} (${violations.length} a11y rule(s) failing)`);
-      }
-    } finally {
-      await context.close();
-    }
+        return next;
+      },
+    });
 
     const brokenRefs = await checkRefs(refs, baseUrl);
     return { pages, axe: axeResults, brokenRefs };

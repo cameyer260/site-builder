@@ -1,15 +1,10 @@
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { CHECKLIST } from "../synthesize/checklist.ts";
-import {
-  displayFieldValue,
-  type Profile,
-  type ProfileField,
-  writeProfile,
-} from "../synthesize/profile.ts";
-import { renderChecklistGaps } from "../synthesize/synthesize.ts";
+import { displayFieldValue, type Profile, type ProfileField } from "../synthesize/profile.ts";
+import { persistProfile } from "../synthesize/synthesize.ts";
 import type { Logger } from "../util/log.ts";
 
 /**
@@ -133,8 +128,7 @@ export async function runQaSession(params: QaParams): Promise<Profile> {
  * answers so the generate build reads them as first-class facts.
  */
 function persist(contextDir: string, profile: Profile): void {
-  writeProfile(join(contextDir, "profile.json"), profile);
-  writeFileSync(join(contextDir, "checklist.md"), renderChecklistGaps(profile));
+  persistProfile(contextDir, profile);
 
   const provided = profile.fields.filter((f) => f.note === PROVIDED_NOTE);
   if (provided.length > 0) {

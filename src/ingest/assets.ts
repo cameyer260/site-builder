@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
+import { uniqueName } from "../util/names.ts";
 
 /** The asset sources v1 captures (CONTEXT.md > Asset; roadmap defers the rest). */
 export type AssetKind = "img" | "og" | "favicon";
@@ -32,7 +33,7 @@ const CONTENT_TYPE_EXT: Record<string, string> = {
 };
 
 /** Picks a unique, sanitized filename for an asset URL within `used`. */
-function uniqueName(url: string, contentType: string | null, used: Set<string>): string {
+function assetFileName(url: string, contentType: string | null, used: Set<string>): string {
   let stem = "asset";
   let ext = "";
   try {
@@ -50,14 +51,7 @@ function uniqueName(url: string, contentType: string | null, used: Set<string>):
   }
   stem = stem.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "") || "asset";
 
-  let candidate = `${stem}${ext}`;
-  let n = 1;
-  while (used.has(candidate)) {
-    candidate = `${stem}-${n}${ext}`;
-    n += 1;
-  }
-  used.add(candidate);
-  return candidate;
+  return uniqueName(stem, used, ext);
 }
 
 /**
@@ -82,7 +76,7 @@ export async function downloadAsset(
     if (bytes.length === 0 || bytes.length > MAX_ASSET_BYTES) {
       return null;
     }
-    const name = uniqueName(source.url, res.headers.get("content-type"), used);
+    const name = assetFileName(source.url, res.headers.get("content-type"), used);
     mkdirSync(destDir, { recursive: true });
     const path = join(destDir, name);
     await writeFile(path, bytes);

@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import pc from "picocolors";
+import { nowIso } from "./time.ts";
 
 /**
  * Minimal leveled logger. Writes a colorized line to the console and, when a
@@ -38,7 +39,7 @@ export function createLogger(opts: { file?: string; quiet?: boolean } = {}): Log
     }
     if (file) {
       try {
-        appendFileSync(file, `${new Date().toISOString()} [${level}] ${msg}\n`);
+        appendFileSync(file, `${nowIso()} [${level}] ${msg}\n`);
       } catch {
         // never let logging failures crash the run
       }

@@ -1,8 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { UserError } from "../util/errors.ts";
-import { type Config, ConfigSchema, formatZodError } from "./schema.ts";
+import { readJsonFile } from "../util/json.ts";
+import { formatZodError } from "../util/zod.ts";
+import { type Config, ConfigSchema } from "./schema.ts";
 
 /**
  * Resolves the config directory. Honors `SB_CONFIG_DIR` (used by tests to point
@@ -30,23 +32,11 @@ export function loadConfig(): Config | null {
   if (!existsSync(p)) {
     return null;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(p, "utf8"));
-  } catch {
-    throw new UserError(
-      `config at ${p} is not valid JSON`,
-      "fix or delete it, then run `sb config`",
-    );
-  }
-  const parsed = ConfigSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new UserError(
-      `config at ${p} is invalid: ${formatZodError(parsed.error)}`,
-      "run `sb config` to repair it",
-    );
-  }
-  return parsed.data;
+  return readJsonFile(p, ConfigSchema, {
+    label: `config at ${p}`,
+    notJsonHint: "fix or delete it, then run `sb config`",
+    invalidHint: "run `sb config` to repair it",
+  });
 }
 
 export function loadConfigOrThrow(): Config {

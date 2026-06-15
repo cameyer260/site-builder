@@ -7,6 +7,7 @@ import { profilesFromConfig } from "../playwright/screenshot.ts";
 import type { ClientInputs } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import type { Logger } from "../util/log.ts";
+import { nowIso } from "../util/time.ts";
 import { downloadAsset } from "./assets.ts";
 import { crawlSite } from "./crawl.ts";
 import { docKind, extractDoc } from "./docs.ts";
@@ -38,7 +39,7 @@ export async function runIngest(params: IngestParams): Promise<IngestManifest> {
   const rel = (absolute: string): string => relative(ingestDir, absolute);
 
   const manifest: IngestManifest = {
-    createdAt: new Date().toISOString(),
+    createdAt: nowIso(),
     inputs: {
       url: inputs.url,
       docCount: inputs.docs.length,
