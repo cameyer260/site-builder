@@ -159,6 +159,11 @@ its recorded Inputs):
 - `--style <text>` — steer the Design Brief's **visual aesthetic** (e.g. `--style "high-contrast, condensed type"`).
 - `--yes` / `-y` — skip the interactive QA session (Unknowns become Guessed).
 
+> These three flags only feed the `generate` stage. On a **continue** whose first
+> unfinished stage is already past `generate` (`audit` or `deploy`), they have no
+> effect — passing them prints a warning rather than silently dropping them. The
+> same holds for `sb resume`.
+
 **Continue flags:**
 
 - `--refresh` — force a context re-run + new Site Version with no new Inputs
@@ -185,6 +190,11 @@ sb resume <client> [--vibe <text>] [--style <text>] [--yes]
 Strictly continues the latest run from its first unfinished stage. Clears that
 stage's own outputs (clear-own-output) and keeps earlier artifacts (keep-prior).
 Unlike `build`, it never forks or refreshes.
+
+`--vibe`, `--style`, and `--yes` only feed the `generate` stage (the brief's
+style hints and the QA gate). If the resume point is already past `generate`
+(i.e. `audit` or `deploy`), they have no effect — passing them prints a warning
+rather than silently dropping them.
 
 ### `push` — publish to GitHub (opt-in)
 

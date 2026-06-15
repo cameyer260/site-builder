@@ -10,7 +10,7 @@ import {
   type State,
   writeState,
 } from "../storage/state.ts";
-import { STAGES, stageNamesFor } from "./pipeline.ts";
+import { STAGES, stageIndex, stageNamesFor } from "./pipeline.ts";
 import type { Phase, RunContext, Stage } from "./types.ts";
 
 export interface RunResult {
@@ -157,7 +157,7 @@ function clearContextOutputs(ctx: RunContext): void {
  */
 export async function smartBuild(
   ctx: RunContext,
-  opts: { refresh: boolean },
+  opts: { refresh: boolean; flags?: GenerateFlags },
 ): Promise<BuildOutcome> {
   if (!existsSync(ctx.paths.clientJson)) {
     ctx.version = 1;
@@ -177,7 +177,7 @@ export async function smartBuild(
   if (!findResumeStage(ctx)) {
     return { ok: true, ran: [], kind: "noop", version };
   }
-  return { ...(await resumePipeline(ctx)), kind: "continue", version };
+  return { ...(await resumePipeline(ctx, opts.flags)), kind: "continue", version };
 }
 
 /**
@@ -197,17 +197,69 @@ export function findResumeStage(ctx: RunContext): Stage | null {
 }
 
 /**
+ * The flags consumed only by the `generate` stage (the brief's style hints and
+ * the QA gate). When a resume lands past `generate` they are dead values, so we
+ * report them rather than dropping them silently. Shared by `sb resume` and
+ * `sb build`'s continue path, which both funnel through `resumePipeline`.
+ */
+export interface GenerateFlags {
+  vibe?: string;
+  style?: string;
+  yes?: boolean;
+}
+
+/**
+ * The `generate`-only flags that have no effect at `resumeStage`, in `--flag`
+ * form. Empty when the resume reaches `generate` or an earlier stage (where the
+ * flags are still live) or when none were passed. Pure — exported for testing.
+ */
+export function generateOnlyFlagsIgnored(resumeStage: Stage, flags: GenerateFlags): string[] {
+  if (stageIndex(resumeStage.name) <= stageIndex("generate")) {
+    return [];
+  }
+  const ignored: string[] = [];
+  if (flags.vibe !== undefined) {
+    ignored.push("--vibe");
+  }
+  if (flags.style !== undefined) {
+    ignored.push("--style");
+  }
+  if (flags.yes) {
+    ignored.push("--yes");
+  }
+  return ignored;
+}
+
+function warnGenerateOnlyFlags(ctx: RunContext, stage: Stage, flags?: GenerateFlags): void {
+  if (!flags) {
+    return;
+  }
+  const ignored = generateOnlyFlagsIgnored(stage, flags);
+  if (ignored.length === 0) {
+    return;
+  }
+  const one = ignored.length === 1;
+  ctx.log.warn(
+    `${ignored.join(", ")} ${one ? "has no effect" : "have no effect"} when resuming at ` +
+      `"${stage.name}" — ${one ? "it only feeds" : "they only feed"} the generate stage, ` +
+      "which is already complete",
+  );
+}
+
+/**
  * Resumes a failed run from its last incomplete stage. Clears that stage's own
  * output first (clear-own-output) while leaving prior stages' artifacts intact
- * (keep-prior), then continues to the end.
+ * (keep-prior), then continues to the end. `flags` carries the `generate`-only
+ * flags so they can be warned about when the resume point is already past them.
  */
-export async function resumePipeline(ctx: RunContext): Promise<RunResult> {
+export async function resumePipeline(ctx: RunContext, flags?: GenerateFlags): Promise<RunResult> {
   const stage = findResumeStage(ctx);
   if (!stage) {
     ctx.log.success("nothing to resume — pipeline already complete");
     return { ok: true, ran: [] };
   }
 
+  warnGenerateOnlyFlags(ctx, stage, flags);
   ctx.log.step(`resuming at "${stage.name}"`);
   for (const output of stage.outputs(ctx)) {
     rmSync(output, { recursive: true, force: true });

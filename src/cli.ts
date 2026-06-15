@@ -25,12 +25,14 @@ Commands:
   build <client> …       Create a Client and run the full pipeline, or smartly
                          continue/refresh an existing one
                          inputs: --url --docs --images --notes --pages
-                         generate: --vibe <text> --style <text> --yes (skip QA)
+                         generate: --vibe <text> --style <text> --yes (skip QA;
+                         warned + ignored when a continue is past generate)
                          continue: --refresh (re-ingest) --github (publish repo)
   variant <client>       Generate a new Site Version from existing context
                          flags: --vibe --style --github --yes
   resume <client>        Continue a failed run from its last incomplete stage
-                         flags: --vibe --style --yes
+                         flags: --vibe --style --yes (warned + ignored if the
+                         resume is already past the generate stage)
   push <client>          Publish a Site Version's source to a private GitHub repo
                          flags: --version <n>
 

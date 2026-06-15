@@ -122,6 +122,46 @@ test("resume clears the resumed stage's own output (clear-own-output)", async ()
   expect(readClient(ctx.paths.clientJson)?.name).toBe("Gamma");
 });
 
+test("resume warns about generate-only flags when the resume point is past generate", async () => {
+  await runBuild(makeCtx("Epsilon"));
+
+  // Knock the completed deploy back to failed so the resume point is `deploy`,
+  // which sits past `generate` — its style/QA flags are dead at that point.
+  const ctx = makeCtx("Epsilon");
+  const gen = readState(ctx.paths.versionState(1));
+  if (!gen) {
+    throw new Error("expected generation state");
+  }
+  markFailed(gen, "deploy", "synthetic");
+  writeState(ctx.paths.versionState(1), gen);
+
+  const warnings: string[] = [];
+  ctx.log = { ...ctx.log, warn: (m) => warnings.push(m) };
+
+  const result = await resumePipeline(ctx, { vibe: "calm", style: "bold", yes: true });
+  expect(result.ok).toBe(true);
+
+  const flagWarns = warnings.filter((w) => w.includes("generate stage"));
+  expect(flagWarns).toHaveLength(1);
+  expect(flagWarns[0]).toContain("--vibe");
+  expect(flagWarns[0]).toContain("--style");
+  expect(flagWarns[0]).toContain("--yes");
+  expect(flagWarns[0]).toContain("deploy");
+});
+
+test("resume does not warn about generate-only flags when resuming at or before generate", async () => {
+  // synthesize fails → resume starts at `synthesize`, before `generate`, so the
+  // flags are still live and must not be reported as ignored.
+  await runBuild(makeCtx("Zeta", { engine: fakeStageEngine({ failProfile: true }) }));
+
+  const ctx = makeCtx("Zeta");
+  const warnings: string[] = [];
+  ctx.log = { ...ctx.log, warn: (m) => warnings.push(m) };
+
+  await resumePipeline(ctx, { vibe: "calm", style: "bold", yes: true });
+  expect(warnings.filter((w) => w.includes("generate stage"))).toHaveLength(0);
+});
+
 test("resume on a fully complete pipeline is a no-op", async () => {
   await runBuild(makeCtx("Delta"));
   const ctx = makeCtx("Delta");

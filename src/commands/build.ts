@@ -99,7 +99,10 @@ export async function buildCommand(args: string[]): Promise<number> {
   });
   ctx.log.step(`building Client "${name}" at ${ctx.paths.dir}`);
 
-  const result = await smartBuild(ctx, { refresh: exists && refresh });
+  const result = await smartBuild(ctx, {
+    refresh: exists && refresh,
+    flags: { vibe: values.vibe, style: values.style, yes: values.yes },
+  });
 
   if (!result.ok) {
     console.error(

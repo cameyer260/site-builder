@@ -42,7 +42,12 @@ export async function resumeCommand(args: string[]): Promise<number> {
     vibe: values.vibe,
     style: values.style,
   });
-  const result = await resumePipeline(ctx);
+
+  const result = await resumePipeline(ctx, {
+    vibe: values.vibe,
+    style: values.style,
+    yes: values.yes,
+  });
   if (result.ok) {
     if (result.ran.length > 0) {
       ctx.log.success(`resume complete — ran ${result.ran.join(" → ")}`);
