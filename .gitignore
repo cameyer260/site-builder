@@ -7,3 +7,4 @@ dist/
 NOTES.md
 node_modules.claudey/
 node_modules.codey/
+.env*
