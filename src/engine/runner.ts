@@ -306,6 +306,19 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
 }
 
 /**
+ * A human-facing failure reason for a non-ok engine run: the interpreted error
+ * plus a compact tail of the child's stderr when present. Stage failures route
+ * through this so a crash the engine printed only to stderr — never to the
+ * stream-json result event (e.g. a `claudey` wrapper not forwarding stdin, or an
+ * auth error) — is surfaced instead of silently dropped. See ADR-0001.
+ */
+export function engineFailureReason(result: EngineResult): string {
+  const reason = result.error ?? "engine failed with no result";
+  const tail = result.stderrTail?.trim();
+  return tail ? `${reason} (stderr: ${tail.slice(-800)})` : reason;
+}
+
+/**
  * The shape of `runEngine`, so AI stages can accept an injected runner. Stages
  * default to the real `runEngine`; tests pass a fake that simulates the model
  * writing its on-disk artifacts, keeping the pipeline offline and deterministic.

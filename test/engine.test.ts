@@ -6,6 +6,7 @@ import { playwrightMcpConfig } from "../src/engine/mcp.ts";
 import {
   buildEngineArgs,
   type EngineOptions,
+  engineFailureReason,
   interpretResult,
   parseStreamJson,
   runEngine,
@@ -109,6 +110,23 @@ test("interpretResult: no result event is a failure", () => {
   const r = interpretResult({ events: [ev({ type: "system" })], exitCode: 0 });
   expect(r.ok).toBe(false);
   expect(r.error).toContain("no result event");
+});
+
+test("engineFailureReason: appends the stderr tail when the engine only printed there", () => {
+  // The real failure mode: no result event, exit 1, the cause on stderr only.
+  const r = interpretResult({
+    events: [],
+    exitCode: 1,
+    stderrTail: "Error: Input must be provided either through stdin or as a prompt argument\n",
+  });
+  const reason = engineFailureReason(r);
+  expect(reason).toContain("engine exited 1 with no result event");
+  expect(reason).toContain("stdin");
+});
+
+test("engineFailureReason: omits the stderr clause when stderr is empty", () => {
+  const r = interpretResult({ events: [], exitCode: 1, stderrTail: "  " });
+  expect(engineFailureReason(r)).toBe("engine exited 1 with no result event");
 });
 
 test("interpretResult: spawn error short-circuits", () => {

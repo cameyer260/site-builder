@@ -1,7 +1,7 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
-import { type EngineRunner, runEngine } from "../engine/runner.ts";
+import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import { displayFieldValue, type Profile } from "../synthesize/profile.ts";
@@ -69,7 +69,7 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
   }
 
   log.warn(
-    `generate: Design Brief call ${result.ok ? "wrote no brief.md" : `failed (${result.error})`}; using a Profile-derived brief`,
+    `generate: Design Brief call ${result.ok ? "wrote no brief.md" : `failed (${engineFailureReason(result)})`}; using a Profile-derived brief`,
   );
   writeFileSync(briefMdPath, fallbackBrief(profile, vibe, style));
 }

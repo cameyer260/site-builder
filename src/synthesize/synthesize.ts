@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
-import { type EngineRunner, runEngine } from "../engine/runner.ts";
+import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
 import type { IngestManifest } from "../ingest/manifest.ts";
 import type { Client } from "../storage/client.ts";
@@ -76,7 +76,7 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
     } else {
       // Asset classification is best-effort: a failure falls back to logo-only.
       log.warn(
-        `synthesize: asset classification unavailable (${result.ok ? "no valid assets.json" : result.error}); using fallbacks`,
+        `synthesize: asset classification unavailable (${result.ok ? "no valid assets.json" : engineFailureReason(result)}); using fallbacks`,
       );
     }
   } else {
@@ -108,7 +108,9 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
     log,
   });
   if (!profileResult.ok) {
-    throw new UserError(`synthesize: profile synthesis failed: ${profileResult.error}`);
+    throw new UserError(
+      `synthesize: profile synthesis failed: ${engineFailureReason(profileResult)}`,
+    );
   }
 
   const profile = finalizeProfile(contextDir, client.name, assets);

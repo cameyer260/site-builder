@@ -63,10 +63,20 @@ export function displayFieldValue(value: FieldValue): string {
   return Array.isArray(value) ? value.join(", ") : value;
 }
 
+/**
+ * A contact fact. The synthesizing model sets unknown answers to `null` (the
+ * same convention as Checklist field values), so we coerce `null`/empty to
+ * `undefined` and keep the stored type a plain optional string.
+ */
+const ContactFieldSchema = z.preprocess(
+  (raw) => (raw === null || raw === "" ? undefined : raw),
+  z.string().optional(),
+);
+
 export const ContactSchema = z.object({
-  email: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
+  email: ContactFieldSchema,
+  phone: ContactFieldSchema,
+  address: ContactFieldSchema,
 });
 
 /** One classified, canonically-named Asset (or a Fallback Asset). */

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildSite, ensureBuiltDist, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
-import { type EngineRunner, runEngine } from "../engine/runner.ts";
+import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
 import { profilesFromConfig } from "../playwright/screenshot.ts";
 import type { Client } from "../storage/client.ts";
@@ -109,7 +109,7 @@ export async function runAudit(params: AuditParams): Promise<void> {
     log,
   });
   if (!review.ok) {
-    throw new UserError(`audit: AI review failed: ${review.error}`);
+    throw new UserError(`audit: AI review failed: ${engineFailureReason(review)}`);
   }
   // The findings file must always exist (milestone): synthesize one from the
   // deterministic checks if the model didn't write its own.
