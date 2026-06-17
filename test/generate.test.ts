@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runCommand } from "../src/astro/run.ts";
+import { hasLocalAstroBin, runCommand } from "../src/astro/run.ts";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
 import { runGenerate } from "../src/generate/generate.ts";
 import { readImagesManifest, resolveImages } from "../src/generate/pexels.ts";
@@ -306,4 +306,14 @@ test("runCommand reports success and failure exit codes", async () => {
   const badResult = await runCommand("node", ["-e", "process.exit(3)"], { cwd: root });
   expect(badResult.ok).toBe(false);
   expect(badResult.code).toBe(3);
+});
+
+test("hasLocalAstroBin treats incomplete node_modules as missing dependencies", () => {
+  const siteDir = join(root, "site");
+  mkdirSync(join(siteDir, "node_modules"), { recursive: true });
+  expect(hasLocalAstroBin(siteDir)).toBe(false);
+
+  mkdirSync(join(siteDir, "node_modules", ".bin"), { recursive: true });
+  writeFileSync(join(siteDir, "node_modules", ".bin", "astro"), "");
+  expect(hasLocalAstroBin(siteDir)).toBe(true);
 });

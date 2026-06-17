@@ -122,6 +122,29 @@ test("resume clears the resumed stage's own output (clear-own-output)", async ()
   expect(readClient(ctx.paths.clientJson)?.name).toBe("Gamma");
 });
 
+test("stage failures surface UserError hints without storing them in state", async () => {
+  const ctx = makeCtx("Eta");
+  const errors: string[] = [];
+  ctx.log = { ...ctx.log, error: (m) => errors.push(m) };
+  ctx.buildSite = async () => ({
+    ok: false,
+    code: 1,
+    output: "Expected a default export from src/pages/index.astro",
+  });
+
+  const result = await runBuild(ctx);
+
+  expect(result.ok).toBe(false);
+  expect(result.failedStage).toBe("generate");
+  expect(result.error).toMatch(/astro build failed/);
+  expect(result.errorHint).toContain("Expected a default export");
+  expect(errors.some((m) => m.includes("Expected a default export"))).toBe(true);
+
+  const generation = readState(ctx.paths.versionState(1));
+  expect(generation?.stages.generate?.error).toMatch(/astro build failed/);
+  expect(generation?.stages.generate?.error).not.toContain("Expected a default export");
+});
+
 test("resume warns about generate-only flags when the resume point is past generate", async () => {
   await runBuild(makeCtx("Epsilon"));
 

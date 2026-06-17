@@ -10,6 +10,7 @@ import {
   type State,
   writeState,
 } from "../storage/state.ts";
+import { UserError } from "../util/errors.ts";
 import { STAGES, stageIndex, stageNamesFor } from "./pipeline.ts";
 import type { Phase, RunContext, Stage } from "./types.ts";
 
@@ -18,6 +19,8 @@ export interface RunResult {
   /** Set when ok is false: the stage that failed and its error message. */
   failedStage?: string;
   error?: string;
+  /** Extra diagnostic text for the current failure, kept out of state.json. */
+  errorHint?: string;
   /** Stage names completed during this invocation. */
   ran: string[];
 }
@@ -53,6 +56,18 @@ function flush(handle: StateHandle): void {
   writeState(handle.path, handle.state);
 }
 
+function failureMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function failureHint(err: unknown): string | undefined {
+  if (!(err instanceof UserError)) {
+    return undefined;
+  }
+  const hint = err.hint?.trim();
+  return hint && hint.length > 0 ? hint : undefined;
+}
+
 /** Runs the pipeline from `startStage` (its name) to the end. */
 async function runFrom(ctx: RunContext, startStage: string): Promise<RunResult> {
   const start = STAGES.findIndex((s) => s.name === startStage);
@@ -82,11 +97,15 @@ async function runFrom(ctx: RunContext, startStage: string): Promise<RunResult> 
     try {
       await stage.run(ctx);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = failureMessage(err);
+      const hint = failureHint(err);
       markFailed(handle.state, stage.name, message);
       flush(handle);
       ctx.log.error(`stage "${stage.name}" failed: ${message}`);
-      return { ok: false, failedStage: stage.name, error: message, ran };
+      if (hint) {
+        ctx.log.error(hint);
+      }
+      return { ok: false, failedStage: stage.name, error: message, errorHint: hint, ran };
     }
 
     markCompleted(handle.state, stage.name);

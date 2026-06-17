@@ -22,6 +22,11 @@ const OUTPUT_TAIL = 8000;
 const INSTALL_TIMEOUT_MS = 600_000;
 const BUILD_TIMEOUT_MS = 600_000;
 
+export function hasLocalAstroBin(siteDir: string): boolean {
+  const binDir = join(siteDir, "node_modules", ".bin");
+  return existsSync(join(binDir, "astro")) || existsSync(join(binDir, "astro.cmd"));
+}
+
 /**
  * Spawns a command in `cwd`, capturing a tail of its combined output. Never
  * rejects: a spawn error or non-zero exit is reported in the resolved result.
@@ -102,12 +107,14 @@ export async function astroBuild(siteDir: string, log?: Logger): Promise<Command
 }
 
 /**
- * The full compile gate: install dependencies (when absent) then `astro build`.
- * Returns the failing step's output so the caller can surface it. This is the
- * default `buildSite` the `generate` stage runs; tests inject a fake instead.
+ * The full compile gate: install dependencies when the local Astro command is
+ * absent, then run `astro build`. A stale/partial `node_modules` directory is
+ * not enough; the npm script needs `node_modules/.bin/astro` on PATH. Returns
+ * the failing step's output so the caller can surface it. This is the default
+ * `buildSite` the `generate` stage runs; tests inject a fake instead.
  */
 export async function buildSite(siteDir: string, log?: Logger): Promise<CommandResult> {
-  if (!existsSync(join(siteDir, "node_modules"))) {
+  if (!hasLocalAstroBin(siteDir)) {
     const installed = await installDeps(siteDir, log);
     if (!installed.ok) {
       return installed;
