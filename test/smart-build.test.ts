@@ -101,6 +101,39 @@ test("an incomplete run is continued in place (no new version)", async () => {
   expect(readState(paths.versionState(1))?.stages.deploy?.status).toBe("completed");
 });
 
+test("a refresh that fails before generation resumes into its target Version, not the previous one", async () => {
+  // A complete v1 to refresh away from.
+  await smartBuild(makeCtx("Theta"), { refresh: false });
+
+  // Refresh toward v2, but synthesize (context phase) fails before v2's dir is
+  // ever materialized on disk.
+  const failed = await smartBuild(
+    makeCtx("Theta", { engine: fakeStageEngine({ failProfile: true }) }),
+    {
+      refresh: true,
+    },
+  );
+  expect(failed.ok).toBe(false);
+  expect(failed.failedStage).toBe("synthesize");
+  expect(failed.version).toBe(2);
+
+  const paths = clientPaths(root, "Theta");
+  // v2 never materialized — only v1 on disk — but the target Version was recorded.
+  expect(existsSync(paths.versionDir(2))).toBe(false);
+  expect(readState(paths.state)?.targetVersion).toBe(2);
+
+  // A plain continue must pick up the v2 intent, not regenerate over v1.
+  const resumed = await smartBuild(makeCtx("Theta"), { refresh: false });
+  expect(resumed.kind).toBe("continue");
+  expect(resumed.version).toBe(2);
+  expect(resumed.ran).toEqual(["synthesize", "generate", "audit", "deploy"]);
+
+  // v1 preserved, v2 created.
+  expect(existsSync(paths.versionDir(1))).toBe(true);
+  expect(existsSync(paths.versionDir(2))).toBe(true);
+  expect(readClient(paths.clientJson)?.sites.map((s) => s.version)).toEqual([1, 2]);
+});
+
 test("variant generates a new Site Version from existing context", async () => {
   await smartBuild(makeCtx("Epsilon"), { refresh: false });
 

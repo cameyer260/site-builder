@@ -1,9 +1,9 @@
 import { parseArgs } from "node:util";
 import pc from "picocolors";
 import { loadConfigOrThrow } from "../config/store.ts";
-import { resumePipeline } from "../pipeline/orchestrator.ts";
+import { resumePipeline, resumeVersion } from "../pipeline/orchestrator.ts";
 import { buildRunContext } from "../runtime.ts";
-import { clientExists, clientPaths, latestVersion } from "../storage/layout.ts";
+import { clientExists, clientPaths } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 
 const USAGE = "usage: sb resume <client> [--vibe <text>] [--style <text>] [--yes]";
@@ -28,9 +28,10 @@ export async function resumeCommand(args: string[]): Promise<number> {
     throw new UserError(`no Client found for "${name}"`, "run `sb build` first");
   }
 
-  // Resume targets the latest Site Version (or v1 if generation never started).
+  // Resume targets the in-flight Site Version: the target a refresh recorded
+  // before it failed, else the latest on disk (or v1 if generation never started).
   const paths = clientPaths(config.root, name);
-  const version = latestVersion(paths.sites) ?? 1;
+  const version = resumeVersion(paths);
 
   const interactive = Boolean(process.stdin.isTTY) && !values.yes;
   const ctx = buildRunContext({

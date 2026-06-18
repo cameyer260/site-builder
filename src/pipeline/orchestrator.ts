@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { relative } from "node:path";
-import { latestVersion, nextVersion } from "../storage/layout.ts";
+import { type ClientPaths, latestVersion, nextVersion } from "../storage/layout.ts";
 import {
   ensureState,
   markCompleted,
@@ -186,17 +186,47 @@ export async function smartBuild(
   if (opts.refresh) {
     const version = nextVersion(ctx.paths.sites);
     ctx.version = version;
+    // Record the target Version before any context stage runs, so a failure in
+    // the context phase (before vN's dir exists) doesn't lose the new-version
+    // intent — a later resume reads it back instead of regenerating over vN-1.
+    recordTargetVersion(ctx.paths, version);
     clearContextOutputs(ctx);
     ctx.log.step(`build: refreshing context, then generating Site v${version}`);
     return { ...(await runFrom(ctx, "ingest")), kind: "refresh", version };
   }
 
-  const version = latestVersion(ctx.paths.sites) ?? 1;
+  const version = resumeVersion(ctx.paths);
   ctx.version = version;
   if (!findResumeStage(ctx)) {
     return { ok: true, ran: [], kind: "noop", version };
   }
   return { ...(await resumePipeline(ctx, opts.flags)), kind: "continue", version };
+}
+
+/**
+ * Stamps the context-phase state with the Site Version a refresh is building
+ * toward, before any context stage runs. See `targetVersion` in the state schema.
+ */
+function recordTargetVersion(paths: ClientPaths, version: number): void {
+  const state = ensureState(paths.state, "context", stageNamesFor("context"));
+  state.targetVersion = version;
+  writeState(paths.state, state);
+}
+
+/**
+ * The Site Version a resume/continue should target. Prefers the target Version a
+ * refresh recorded on the context state, but only while it is still ahead of
+ * what's on disk — i.e. its version dir was never materialized because the run
+ * died in the context phase. Once that dir (or a newer one, e.g. from a variant)
+ * exists, the on-disk maximum is authoritative and the recorded value is stale.
+ */
+export function resumeVersion(paths: ClientPaths): number {
+  const onDisk = latestVersion(paths.sites);
+  const recorded = readState(paths.state)?.targetVersion;
+  if (recorded !== undefined && (onDisk === null || recorded > onDisk)) {
+    return recorded;
+  }
+  return onDisk ?? 1;
 }
 
 /**

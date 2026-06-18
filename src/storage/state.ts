@@ -35,6 +35,14 @@ export const StateSchema = z.object({
   phase: PhaseSchema,
   /** Present for generation-phase state; the Site Version this file tracks. */
   version: z.number().int().positive().optional(),
+  /**
+   * Present on the context-phase state while a refresh is in flight: the Site
+   * Version the run is building toward. The generation version dir is only
+   * materialized once a generation stage runs, so without this a refresh that
+   * dies in the context phase leaves no trace of its target Version and a later
+   * resume would fall back to the previous one (regenerating over it).
+   */
+  targetVersion: z.number().int().positive().optional(),
   stages: z.record(z.string(), StageRecordSchema),
   lastRun: LastRunSchema.optional(),
   createdAt: z.string(),
