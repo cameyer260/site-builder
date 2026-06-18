@@ -193,3 +193,18 @@ test("runEngine: a rate-limit stall is abandoned after the grace window, not the
   expect(result.ok).toBe(false);
   expect(result.error).toContain("stalled after a rate limit");
 }, 20_000);
+
+test("runEngine: a benign quota ping does NOT arm the stall watchdog", async () => {
+  const result = await runEngine(FAKE_ENGINE, {
+    prompt: "BENIGN_STALL",
+    cwd: dir,
+    // Tiny grace, larger timeout: if an "allowed" ping wrongly armed the watchdog
+    // it would fire first and report a rate-limit stall. Correct behaviour is to
+    // ignore it and let only the wall-clock timeout end the run.
+    rateLimitGraceMs: 200,
+    timeoutMs: 1500,
+  });
+  expect(result.ok).toBe(false);
+  expect(result.error).toContain("timed out");
+  expect(result.error).not.toContain("stalled after a rate limit");
+}, 20_000);

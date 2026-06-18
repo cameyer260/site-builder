@@ -39,6 +39,27 @@ interface ResultEvent extends StreamEvent {
   usage?: unknown;
 }
 
+/**
+ * Quota telemetry the engine emits as a `rate_limit_event`. It fires on
+ * essentially every run as informational status (`status: "allowed"` or
+ * `"allowed_warning"`), *not* only when throttled — so the mere presence of the
+ * event says nothing. Only `status: "rejected"` means the request was actually
+ * blocked and the engine is now waiting for the window (`resetsAt`) to reset.
+ */
+interface RateLimitEvent extends StreamEvent {
+  type: "rate_limit_event";
+  rate_limit_info?: {
+    status?: string;
+    rateLimitType?: string;
+    resetsAt?: number;
+  };
+}
+
+/** The engine is actually throttled (blocked) only on a `rejected` status. */
+function isThrottled(event: RateLimitEvent): boolean {
+  return event.rate_limit_info?.status === "rejected";
+}
+
 export interface EngineOptions {
   /** The user/stage prompt; delivered to the engine on stdin. */
   prompt: string;
@@ -69,10 +90,10 @@ export interface EngineOptions {
   /** Kill the engine after this many milliseconds. */
   timeoutMs?: number;
   /**
-   * After the engine reports a rate limit, abort the run if it then produces no
-   * output for this long — rather than waiting out the full `timeoutMs`. Only
-   * armed by a `rate_limit_event`, so a busy engine (e.g. a long, silent build)
-   * is never affected.
+   * After the engine reports a *rejected* rate limit, abort the run if it then
+   * produces no output for this long — rather than waiting out the full
+   * `timeoutMs`. Only armed once the engine is genuinely throttled, so a busy
+   * engine (e.g. a long, silent build) is never affected.
    */
   rateLimitGraceMs?: number;
   /** Logger to tee a one-line trace of each stream event to. */
@@ -299,10 +320,10 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
         : null;
 
     // Rate-limit stall watchdog: a throttled engine can sit silent for the full
-    // wall-clock `timeoutMs` (5–30 min). Once the engine reports a rate limit,
-    // arm a much shorter deadline that any further output resets — a backoff that
-    // recovers is left alone, but one that goes quiet is abandoned fast. Never
-    // armed until a `rate_limit_event`, so a busy engine is never affected.
+    // wall-clock `timeoutMs` (5–30 min). Once the engine reports a *rejected*
+    // rate limit, arm a much shorter deadline that any further output resets — a
+    // backoff that recovers is left alone, but one that goes quiet is abandoned
+    // fast. Never armed by the benign quota pings, so a busy engine is unaffected.
     const bumpRateLimitWatchdog = (): void => {
       if (!rateLimited || settled || opts.rateLimitGraceMs === undefined) {
         return;
@@ -344,13 +365,22 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
         events.push(event);
         opts.onEvent?.(event);
         if (event.type === "rate_limit_event") {
-          rateLimited = true;
-          bumpRateLimitWatchdog();
-          const graceNote =
-            opts.rateLimitGraceMs !== undefined
-              ? ` (aborts after ${Math.round(opts.rateLimitGraceMs / 1000)}s with no further output)`
-              : "";
-          opts.log?.warn(`engine rate limited by the API; waiting for it to clear${graceNote}`);
+          // Most of these are benign quota pings (status "allowed"); only a
+          // `rejected` status means the engine is genuinely blocked and may go
+          // silent waiting for the window to reset. Warn/arm the stall watchdog
+          // only then — otherwise this fires (falsely) on every run.
+          if (isThrottled(event as RateLimitEvent)) {
+            rateLimited = true;
+            bumpRateLimitWatchdog();
+            const graceNote =
+              opts.rateLimitGraceMs !== undefined
+                ? ` (aborts after ${Math.round(opts.rateLimitGraceMs / 1000)}s with no further output)`
+                : "";
+            opts.log?.warn(`engine rate limited by the API; waiting for it to clear${graceNote}`);
+          } else {
+            const status = (event as RateLimitEvent).rate_limit_info?.status ?? "unknown";
+            opts.log?.info(`engine rate_limit_event (${status})`);
+          }
         } else {
           opts.log?.info(
             `engine ${event.type ?? "event"}${event.subtype ? `:${event.subtype}` : ""}`,

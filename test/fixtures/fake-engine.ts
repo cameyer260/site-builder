@@ -14,10 +14,24 @@ function emit(event: Record<string, unknown>): void {
 
 emit({ type: "system", subtype: "init", session_id: "fake-123" });
 
-if (prompt.includes("RATE_LIMIT_STALL")) {
-  // Report a rate limit, then go silent forever without exiting — the runner's
-  // rate-limit watchdog must abandon us rather than wait out the full timeout.
-  emit({ type: "rate_limit_event" });
+// The benign quota ping the engine emits on essentially every run; it must not
+// arm the stall watchdog (status "allowed", not "rejected").
+emit({
+  type: "rate_limit_event",
+  rate_limit_info: { status: "allowed", rateLimitType: "five_hour" },
+});
+
+if (prompt.includes("BENIGN_STALL")) {
+  // Only the benign quota ping above, then silence. The watchdog must NOT arm —
+  // this run can only be ended by the wall-clock timeout, not the stall guard.
+  await new Promise(() => {});
+} else if (prompt.includes("RATE_LIMIT_STALL")) {
+  // Report a *rejected* rate limit, then go silent forever without exiting — the
+  // runner's stall watchdog must abandon us rather than wait out the full timeout.
+  emit({
+    type: "rate_limit_event",
+    rate_limit_info: { status: "rejected", rateLimitType: "five_hour" },
+  });
   await new Promise(() => {});
 } else if (prompt.includes("FAIL")) {
   emit({
