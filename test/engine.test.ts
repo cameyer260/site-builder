@@ -181,3 +181,15 @@ test("runEngine: missing binary resolves to a failure (never throws)", async () 
   expect(result.ok).toBe(false);
   expect(result.error).toContain("not found");
 }, 20_000);
+
+test("runEngine: a rate-limit stall is abandoned after the grace window, not the timeout", async () => {
+  const result = await runEngine(FAKE_ENGINE, {
+    prompt: "RATE_LIMIT_STALL",
+    cwd: dir,
+    rateLimitGraceMs: 500,
+    // Far above the grace: proves the watchdog — not the wall-clock ceiling — fired.
+    timeoutMs: 30_000,
+  });
+  expect(result.ok).toBe(false);
+  expect(result.error).toContain("stalled after a rate limit");
+}, 20_000);

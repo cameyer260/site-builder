@@ -22,6 +22,14 @@ export const NESTED_CLAUDE_MARKERS = [
 ];
 
 /**
+ * How long a stage tolerates silence *after* the engine reports a rate limit
+ * before giving up. Generous enough to ride out a backoff that recovers (the
+ * engine streams events again, resetting it), short enough that a stalled
+ * throttle fails fast instead of burning the stage's full wall-clock timeout.
+ */
+export const STAGE_RATE_LIMIT_GRACE_MS = 120_000;
+
+/**
  * Common EngineOptions for every AI stage. Permission containment is delegated
  * to the `claudey` wrapper by default (ADR-0001); when running against a raw
  * `claude` binary in a sandbox, opt into bypass with
@@ -29,11 +37,12 @@ export const NESTED_CLAUDE_MARKERS = [
  */
 export function stageEngineDefaults(): Pick<
   EngineOptions,
-  "unsetEnv" | "noSessionPersistence" | "dangerouslySkipPermissions"
+  "unsetEnv" | "noSessionPersistence" | "dangerouslySkipPermissions" | "rateLimitGraceMs"
 > {
   return {
     unsetEnv: NESTED_CLAUDE_MARKERS,
     noSessionPersistence: true,
     dangerouslySkipPermissions: process.env.SB_DANGEROUSLY_SKIP_PERMISSIONS === "1",
+    rateLimitGraceMs: STAGE_RATE_LIMIT_GRACE_MS,
   };
 }

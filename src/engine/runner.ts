@@ -68,6 +68,13 @@ export interface EngineOptions {
   unsetEnv?: string[];
   /** Kill the engine after this many milliseconds. */
   timeoutMs?: number;
+  /**
+   * After the engine reports a rate limit, abort the run if it then produces no
+   * output for this long — rather than waiting out the full `timeoutMs`. Only
+   * armed by a `rate_limit_event`, so a busy engine (e.g. a long, silent build)
+   * is never affected.
+   */
+  rateLimitGraceMs?: number;
   /** Logger to tee a one-line trace of each stream event to. */
   log?: Logger;
   /** Called with every parsed stream event (for persistence/inspection). */
@@ -212,6 +219,15 @@ export function interpretResult(input: {
   };
 }
 
+/** Grace given to the engine's process tree to tear down on SIGTERM before we SIGKILL it. */
+const KILL_GRACE_MS = 5_000;
+/**
+ * After the direct child exits, how long to wait for stdout to drain (i.e. for
+ * `close`) before resolving anyway. Bounds the hang when an orphaned grandchild
+ * (e.g. the `claudey` wrapper's `docker run`) keeps the stdout pipe open.
+ */
+const EXIT_DRAIN_MS = 2_000;
+
 /**
  * Spawns the engine, streams stream-json events (teeing a trace to the logger),
  * feeds the prompt on stdin, and resolves with a parsed success/failure verdict.
@@ -223,7 +239,7 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
   let stdoutBuffer = "";
   let stderrTail = "";
   let spawnError: string | undefined;
-  let timedOut = false;
+  let killReason: string | undefined;
 
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
   for (const key of opts.unsetEnv ?? []) {
@@ -237,15 +253,86 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
       env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
       signal: opts.signal,
+      // Own process group, so a timeout can reap the whole tree — not just the
+      // direct child. With `engineBin` = `claudey` the tree is
+      // wrapper → `docker run` → container; killing the lone wrapper orphans the
+      // `docker run`, which keeps the stdout pipe open so `close` never fires.
+      detached: true,
     });
+
+    let settled = false;
+    let exitDrainTimer: NodeJS.Timeout | null = null;
+    let escalationTimer: NodeJS.Timeout | null = null;
+    let rateLimited = false;
+    let rateLimitTimer: NodeJS.Timeout | null = null;
+
+    // A bare `child.kill()` signals only the direct child. Signal the whole
+    // process group so the wrapper *and* its `docker run` go down together;
+    // SIGTERM first so the wrapper can `docker kill` its container, with a
+    // SIGKILL backstop for anything still alive (ADR-0001).
+    const killTree = (signal: NodeJS.Signals): void => {
+      try {
+        if (child.pid !== undefined) {
+          process.kill(-child.pid, signal);
+        } else {
+          child.kill(signal);
+        }
+      } catch {
+        child.kill(signal);
+      }
+    };
+
+    // Tear the engine tree down for `reason` (timeout or rate-limit stall):
+    // SIGTERM, then a SIGKILL backstop after the grace window. First reason wins.
+    const terminate = (reason: string): void => {
+      if (killReason) {
+        return;
+      }
+      killReason = reason;
+      killTree("SIGTERM");
+      escalationTimer = setTimeout(() => killTree("SIGKILL"), KILL_GRACE_MS);
+    };
 
     const timer =
       opts.timeoutMs !== undefined
-        ? setTimeout(() => {
-            timedOut = true;
-            child.kill("SIGKILL");
-          }, opts.timeoutMs)
+        ? setTimeout(() => terminate(`engine timed out after ${opts.timeoutMs}ms`), opts.timeoutMs)
         : null;
+
+    // Rate-limit stall watchdog: a throttled engine can sit silent for the full
+    // wall-clock `timeoutMs` (5–30 min). Once the engine reports a rate limit,
+    // arm a much shorter deadline that any further output resets — a backoff that
+    // recovers is left alone, but one that goes quiet is abandoned fast. Never
+    // armed until a `rate_limit_event`, so a busy engine is never affected.
+    const bumpRateLimitWatchdog = (): void => {
+      if (!rateLimited || settled || opts.rateLimitGraceMs === undefined) {
+        return;
+      }
+      if (rateLimitTimer) {
+        clearTimeout(rateLimitTimer);
+      }
+      rateLimitTimer = setTimeout(
+        () =>
+          terminate(`engine stalled after a rate limit: no output for ${opts.rateLimitGraceMs}ms`),
+        opts.rateLimitGraceMs,
+      );
+    };
+
+    const finish = (code: number | null): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      for (const t of [timer, rateLimitTimer, exitDrainTimer, escalationTimer]) {
+        if (t) {
+          clearTimeout(t);
+        }
+      }
+      ingestLine(stdoutBuffer);
+      if (killReason && !spawnError) {
+        spawnError = killReason;
+      }
+      resolve(interpretResult({ events, exitCode: code, spawnError, stderrTail }));
+    };
 
     const ingestLine = (line: string): void => {
       const trimmed = line.trim();
@@ -256,9 +343,19 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
         const event = JSON.parse(trimmed) as StreamEvent;
         events.push(event);
         opts.onEvent?.(event);
-        opts.log?.info(
-          `engine ${event.type ?? "event"}${event.subtype ? `:${event.subtype}` : ""}`,
-        );
+        if (event.type === "rate_limit_event") {
+          rateLimited = true;
+          bumpRateLimitWatchdog();
+          const graceNote =
+            opts.rateLimitGraceMs !== undefined
+              ? ` (aborts after ${Math.round(opts.rateLimitGraceMs / 1000)}s with no further output)`
+              : "";
+          opts.log?.warn(`engine rate limited by the API; waiting for it to clear${graceNote}`);
+        } else {
+          opts.log?.info(
+            `engine ${event.type ?? "event"}${event.subtype ? `:${event.subtype}` : ""}`,
+          );
+        }
       } catch {
         // non-JSON noise
       }
@@ -273,6 +370,7 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
 
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
+      bumpRateLimitWatchdog();
       stdoutBuffer += chunk;
       let newline = stdoutBuffer.indexOf("\n");
       while (newline >= 0) {
@@ -284,18 +382,24 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
 
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {
+      bumpRateLimitWatchdog();
       stderrTail = (stderrTail + chunk).slice(-2000);
     });
 
+    // `exit` fires the moment the direct child dies; `close` waits for every
+    // stdio stream to end and may never come if an orphaned grandchild still
+    // holds the stdout pipe. Resolve on `close` when it arrives (it carries the
+    // fully-drained output), but fall back to `exit` after a short drain window
+    // so a killed-but-orphaned tree can't hang the pipeline forever.
+    child.on("exit", (code) => {
+      if (settled || exitDrainTimer) {
+        return;
+      }
+      exitDrainTimer = setTimeout(() => finish(code), EXIT_DRAIN_MS);
+    });
+
     child.on("close", (code) => {
-      if (timer) {
-        clearTimeout(timer);
-      }
-      ingestLine(stdoutBuffer);
-      if (timedOut && !spawnError) {
-        spawnError = `engine timed out after ${opts.timeoutMs}ms`;
-      }
-      resolve(interpretResult({ events, exitCode: code, spawnError, stderrTail }));
+      finish(code);
     });
 
     // The prompt is delivered on stdin; swallow EPIPE if the child exits early.

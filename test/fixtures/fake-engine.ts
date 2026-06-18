@@ -14,7 +14,12 @@ function emit(event: Record<string, unknown>): void {
 
 emit({ type: "system", subtype: "init", session_id: "fake-123" });
 
-if (prompt.includes("FAIL")) {
+if (prompt.includes("RATE_LIMIT_STALL")) {
+  // Report a rate limit, then go silent forever without exiting — the runner's
+  // rate-limit watchdog must abandon us rather than wait out the full timeout.
+  emit({ type: "rate_limit_event" });
+  await new Promise(() => {});
+} else if (prompt.includes("FAIL")) {
   emit({
     type: "result",
     subtype: "error_during_execution",
