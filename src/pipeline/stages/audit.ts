@@ -30,6 +30,9 @@ export const auditStage: Stage = {
       buildSite: ctx.buildSite,
       inspect: ctx.inspectSite,
       lighthouse: ctx.runLighthouse,
+      engineKind: ctx.engineKind,
+      engineBin: ctx.engineBin,
+      modelFor: ctx.modelFor,
     });
   },
 };

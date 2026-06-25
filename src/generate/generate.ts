@@ -2,8 +2,10 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:
 import { join } from "node:path";
 import { buildSite, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { type EngineRunner, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
+import { STAGE_TIER } from "../engine/tiers.ts";
 import type { Client } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import type { Profile } from "../synthesize/profile.ts";
@@ -18,7 +20,7 @@ import { buildGeneratePrompt, GENERATE_SYSTEM_PROMPT } from "./prompts.ts";
 import { type QaAsk, runQaSession } from "./qa.ts";
 
 /**
- * The real `generate` stage (build-plan Phase 5): turns the synthesized Context
+ * The real `generate` stage: turns the synthesized Context
  * into a tailored, locally-building Astro Site Version. In order: the QA session
  * resolves the Profile's Unknowns; the Kit is copied in and git-seeded; a small
  * engine call derives the Design Brief; the main engine call builds the Site on
@@ -55,13 +57,29 @@ export interface GenerateParams {
   qaAsk?: QaAsk;
   /** Injected Pexels fetch (tests stub it); defaults to global `fetch`. */
   fetchImpl?: typeof fetch;
+  /** Resolved from RunContext; falls back to config.defaultEngine when absent (e.g. tests). */
+  engineKind?: EngineKind;
+  engineBin?: string;
+  modelFor?: (stage: string) => string;
 }
 
 export async function runGenerate(params: GenerateParams): Promise<void> {
   const { paths, config, version, client, profile, interactive, vibe, style, log } = params;
   const engine = params.engine ?? runEngine;
   const compile = params.buildSite ?? buildSite;
-  const versionDir = paths.versionDir(version);
+
+  // Resolve engine fields; fall back to config defaults so tests need not pass them.
+  const engineKind = params.engineKind ?? config.defaultEngine;
+  const engineProfile = config.engines[engineKind];
+  const engineBin = params.engineBin ?? engineProfile.bin;
+  const modelFor =
+    params.modelFor ??
+    ((stage: string) => {
+      const tier = STAGE_TIER[stage] ?? "best";
+      return engineProfile.models[tier];
+    });
+
+  const versionDir = params.paths.versionDir(version);
 
   // 0. Rebuild from a pristine tree each run/resume (keep state.json).
   clearVersionTree(versionDir);
@@ -84,13 +102,17 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
     style,
     log,
     engine,
+    engineKind,
+    engineBin,
+    modelFor,
   });
 
   // 4. The main AI build on top of the Kit.
   const imagesJsonPath = join(versionDir, IMAGES_JSON_REL);
   log.step("generate: building Site (this can take several minutes)");
-  const build = await engine(config.engineBin, {
+  const build = await engine(engineBin, {
     ...stageEngineDefaults(),
+    engine: engineKind,
     prompt: buildGeneratePrompt({
       clientName: client.name,
       profileMdPath: join(paths.context, "profile.md"),
@@ -101,7 +123,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
     cwd: versionDir,
     addDirs: [paths.context, paths.ingest],
     appendSystemPrompt: GENERATE_SYSTEM_PROMPT,
-    model: config.models.generate,
+    model: modelFor("generate"),
     maxBudgetUsd: GENERATE_BUDGET_USD,
     timeoutMs: GENERATE_TIMEOUT_MS,
     log,

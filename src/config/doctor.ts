@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
+import type { EngineKind } from "../engine/adapter.ts";
 import type { Config } from "./schema.ts";
 
 /**
@@ -20,14 +21,16 @@ function binaryPresent(bin: string): boolean {
   return !(r.error && (r.error as NodeJS.ErrnoException).code === "ENOENT");
 }
 
-function checkEngine(bin: string): CheckResult {
+/**
+ * Checks one engine binary. The defaultEngine's bin is required (blocks runs);
+ * the other two configured bins are optional warnings only.
+ */
+function checkEngine(bin: string, kind: EngineKind, required: boolean): CheckResult {
   const present = binaryPresent(bin);
   return {
-    name: `engine (${bin})`,
+    name: `engine ${kind} (${bin})`,
     ok: present,
-    required: true,
-    // Auth for the claudey wrapper can't be probed cheaply without spending
-    // usage; v1 verifies presence only and trusts the wrapper's own auth.
+    required,
     detail: present ? "present (auth delegated to the wrapper)" : "not found on PATH",
   };
 }
@@ -104,8 +107,12 @@ function checkPexels(key: string | undefined): CheckResult {
 }
 
 export function runDoctor(cfg: Config): CheckResult[] {
+  const engineKinds: EngineKind[] = ["claudey", "codey", "opencode"];
+  const engineChecks = engineKinds.map((kind) =>
+    checkEngine(cfg.engines[kind].bin, kind, kind === cfg.defaultEngine),
+  );
   return [
-    checkEngine(cfg.engineBin),
+    ...engineChecks,
     checkWranglerPresent(cfg.wranglerBin),
     checkWranglerAuth(cfg.wranglerBin),
     checkRoot(cfg.root),

@@ -33,6 +33,9 @@ export const generateStage: Stage = {
       log: ctx.log,
       engine: ctx.engine,
       buildSite: ctx.buildSite,
+      engineKind: ctx.engineKind,
+      engineBin: ctx.engineBin,
+      modelFor: ctx.modelFor,
     });
   },
 };

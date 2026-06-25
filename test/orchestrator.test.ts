@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
 import type { EngineRunner } from "../src/engine/runner.ts";
+import { STAGE_TIER } from "../src/engine/tiers.ts";
 import { findResumeStage, resumePipeline, runBuild } from "../src/pipeline/orchestrator.ts";
 import type { RunContext } from "../src/pipeline/types.ts";
 import { type ClientInputs, ClientInputsSchema, readClient } from "../src/storage/client.ts";
@@ -32,10 +33,18 @@ function makeCtx(
 ): RunContext {
   const paths = clientPaths(root, name);
   mkdirSync(paths.dir, { recursive: true });
+  const engineKind = DEFAULTS.defaultEngine;
+  const engineProfile = DEFAULTS.engines[engineKind];
   return {
     config: { ...DEFAULTS, root } as Config,
     paths,
     version: 1,
+    engineKind,
+    engineBin: engineProfile.bin,
+    modelFor: (stage) => {
+      const tier = STAGE_TIER[stage] ?? "best";
+      return engineProfile.models[tier];
+    },
     log: createLogger({ quiet: true }),
     failAt: opts.failAt,
     inputs: opts.withInputs === false ? undefined : INPUTS,

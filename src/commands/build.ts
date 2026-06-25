@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import pc from "picocolors";
 import { loadConfigOrThrow } from "../config/store.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { runPush } from "../github/push.ts";
 import { smartBuild } from "../pipeline/orchestrator.ts";
 import { buildRunContext } from "../runtime.ts";
@@ -9,7 +10,7 @@ import { clientExists, clientPaths } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 
 const USAGE =
-  "usage: sb build <client> [--url <url>] [--docs <path>…] [--images <path>…] [--notes <text>] [--pages <n>] [--vibe <text>] [--style <text>] [--refresh] [--github] [--yes]";
+  "usage: sb build <client> [--url <url>] [--docs <path>…] [--images <path>…] [--notes <text>] [--pages <n>] [--engine <kind>] [--vibe <text>] [--style <text>] [--refresh] [--github] [--yes]";
 
 /** Flattens repeated and comma-separated list flags into a clean string[]. */
 function splitList(values: string[] | undefined): string[] {
@@ -29,6 +30,7 @@ export async function buildCommand(args: string[]): Promise<number> {
       images: { type: "string", multiple: true },
       notes: { type: "string" },
       pages: { type: "string" },
+      engine: { type: "string" },
       vibe: { type: "string" },
       style: { type: "string" },
       refresh: { type: "boolean" },
@@ -75,6 +77,15 @@ export async function buildCommand(args: string[]): Promise<number> {
     }
   }
 
+  const engineKinds = ["claudey", "codey", "opencode"] as const;
+  if (values.engine !== undefined && !(engineKinds as readonly string[]).includes(values.engine)) {
+    throw new UserError(
+      `unknown engine: "${values.engine}"`,
+      `valid engines: ${engineKinds.join(", ")}`,
+    );
+  }
+  const engineKind = values.engine as EngineKind | undefined;
+
   // Re-passing Inputs to an existing Client both folds them into the record and
   // triggers a context refresh (ADR-0008). `--refresh` forces it with no new
   // Inputs (re-crawl the same ones).
@@ -91,6 +102,7 @@ export async function buildCommand(args: string[]): Promise<number> {
     name,
     version: 1, // smartBuild sets the real target version.
     command: "build",
+    engine: engineKind,
     inputs,
     pageCap,
     interactive,

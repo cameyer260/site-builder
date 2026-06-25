@@ -1,8 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
+import { STAGE_TIER } from "../engine/tiers.ts";
 import type { IngestManifest } from "../ingest/manifest.ts";
 import type { Client } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
@@ -26,10 +28,10 @@ import {
 import { buildAssetPrompt, buildProfilePrompt } from "./prompts.ts";
 
 /**
- * The real `synthesize` stage (build-plan Phase 3): turns the ingested raw
- * material into structured Client context. Two `claude -p` calls — asset
- * classification (vision) and profile synthesis — bracketed by deterministic
- * code that reconciles Assets and derives the Checklist gaps. Owns `context/`.
+ * The real `synthesize` stage: turns the ingested raw material into structured
+ * Client context. Two engine calls — asset classification (vision) and profile
+ * synthesis — bracketed by deterministic code that reconciles Assets and derives
+ * the Checklist gaps. Owns `context/`.
  */
 
 const ASSET_BUDGET_USD = 1.0;
@@ -44,11 +46,28 @@ export interface SynthesizeParams {
   log: Logger;
   /** Injected engine runner (tests pass a fake); defaults to the real one. */
   engine?: EngineRunner;
+  /** Resolved from RunContext; falls back to config.defaultEngine when absent (e.g. tests). */
+  engineKind?: EngineKind;
+  engineBin?: string;
+  modelFor?: (stage: string) => string;
 }
 
 export async function runSynthesize(params: SynthesizeParams): Promise<Profile> {
   const { paths, config, client, manifest, log } = params;
   const engine = params.engine ?? runEngine;
+
+  // Resolve engine fields: use caller-provided values (from RunContext) when
+  // available, falling back to config defaults so tests need not pass them.
+  const engineKind = params.engineKind ?? config.defaultEngine;
+  const engineProfile = config.engines[engineKind];
+  const engineBin = params.engineBin ?? engineProfile.bin;
+  const modelFor =
+    params.modelFor ??
+    ((stage: string) => {
+      const tier = STAGE_TIER[stage] ?? "best";
+      return engineProfile.models[tier];
+    });
+
   const contextDir = paths.context;
   mkdirSync(contextDir, { recursive: true });
 
@@ -60,12 +79,13 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
   let classification: AssetClassification = { assets: [] };
   if (candidates.length > 0) {
     log.step(`synthesize: classifying ${candidates.length} captured asset(s)`);
-    const result = await engine(config.engineBin, {
+    const result = await engine(engineBin, {
       ...defaults,
+      engine: engineKind,
       prompt: buildAssetPrompt({ contextDir, candidates }),
       cwd: contextDir,
       addDirs: sharedDirs,
-      model: config.models.assetClassification,
+      model: modelFor("assetClassification"),
       maxBudgetUsd: ASSET_BUDGET_USD,
       timeoutMs: CALL_TIMEOUT_MS,
       log,
@@ -92,8 +112,9 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
 
   // --- Call B: profile synthesis -> profile.json + profile.md ---------------
   log.step("synthesize: building Client Profile");
-  const profileResult = await engine(config.engineBin, {
+  const profileResult = await engine(engineBin, {
     ...defaults,
+    engine: engineKind,
     prompt: buildProfilePrompt({
       ingestDir: paths.ingest,
       contextDir,
@@ -102,7 +123,7 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
     }),
     cwd: contextDir,
     addDirs: sharedDirs,
-    model: config.models.synthesize,
+    model: modelFor("synthesize"),
     maxBudgetUsd: PROFILE_BUDGET_USD,
     timeoutMs: CALL_TIMEOUT_MS,
     log,

@@ -14,6 +14,7 @@ import {
   saveConfig,
   setConfigValue,
 } from "../config/store.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { UserError } from "../util/errors.ts";
 
 function expandHome(input: string): string {
@@ -50,11 +51,43 @@ async function interactiveSetup(): Promise<number> {
     return 1;
   }
 
-  const engineBin = await p.text({
-    message: "Engine binary (the claudey container wrapper)",
-    initialValue: existing?.engineBin ?? DEFAULTS.engineBin,
+  const defaultEngine = await p.select({
+    message: "Default Engine",
+    options: [
+      { value: "claudey", label: "claudey (Claude Code wrapper — default)" },
+      { value: "codey", label: "codey (Codex/codex exec wrapper)" },
+      { value: "opencode", label: "opencode" },
+    ],
+    initialValue: existing?.defaultEngine ?? DEFAULTS.defaultEngine,
   });
-  if (p.isCancel(engineBin)) {
+  if (p.isCancel(defaultEngine)) {
+    p.cancel("cancelled");
+    return 1;
+  }
+
+  const claudeyBin = await p.text({
+    message: "claudey binary path",
+    initialValue: existing?.engines.claudey.bin ?? DEFAULTS.engines.claudey.bin,
+  });
+  if (p.isCancel(claudeyBin)) {
+    p.cancel("cancelled");
+    return 1;
+  }
+
+  const codeyBin = await p.text({
+    message: "codey binary path (leave empty to skip)",
+    initialValue: existing?.engines.codey.bin ?? DEFAULTS.engines.codey.bin,
+  });
+  if (p.isCancel(codeyBin)) {
+    p.cancel("cancelled");
+    return 1;
+  }
+
+  const opencodeBin = await p.text({
+    message: "opencode binary path (leave empty to skip)",
+    initialValue: existing?.engines.opencode.bin ?? DEFAULTS.engines.opencode.bin,
+  });
+  if (p.isCancel(opencodeBin)) {
     p.cancel("cancelled");
     return 1;
   }
@@ -94,14 +127,27 @@ async function interactiveSetup(): Promise<number> {
 
   const config: Config = {
     root: resolvedRoot,
-    engineBin: engineBin.trim() || DEFAULTS.engineBin,
+    defaultEngine: (defaultEngine as EngineKind) ?? DEFAULTS.defaultEngine,
+    engines: {
+      claudey: {
+        bin: claudeyBin.trim() || DEFAULTS.engines.claudey.bin,
+        models: existing?.engines.claudey.models ?? DEFAULTS.engines.claudey.models,
+      },
+      codey: {
+        bin: codeyBin.trim() || DEFAULTS.engines.codey.bin,
+        models: existing?.engines.codey.models ?? DEFAULTS.engines.codey.models,
+      },
+      opencode: {
+        bin: opencodeBin.trim() || DEFAULTS.engines.opencode.bin,
+        models: existing?.engines.opencode.models ?? DEFAULTS.engines.opencode.models,
+      },
+    },
     wranglerBin: wranglerBin.trim() || DEFAULTS.wranglerBin,
     // gh is only needed for the opt-in --github flow; carry it without prompting.
     ghBin: existing?.ghBin ?? DEFAULTS.ghBin,
     pexelsApiKey: pexels.trim() || undefined,
     viewports: existing?.viewports ?? DEFAULTS.viewports,
     pageCap: existing?.pageCap ?? DEFAULTS.pageCap,
-    models: existing?.models ?? DEFAULTS.models,
   };
   saveConfig(config);
 

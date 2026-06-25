@@ -31,6 +31,9 @@ export const synthesizeStage: Stage = {
       manifest,
       log: ctx.log,
       engine: ctx.engine,
+      engineKind: ctx.engineKind,
+      engineBin: ctx.engineBin,
+      modelFor: ctx.modelFor,
     });
   },
 };

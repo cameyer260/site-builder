@@ -8,7 +8,7 @@ import type { Logger } from "../util/log.ts";
 import { type DeployRunner, deployToCloudflarePages, pagesProjectName } from "./wrangler.ts";
 
 /**
- * The real `deploy` stage (build-plan Phase 7, ADR-0004) — v1's core promise:
+ * The real `deploy` stage (ADR-0004) — v1's core promise:
  * Inputs → shareable live link. It ensures the Site Version has a built `dist/`,
  * Direct-Uploads it to Cloudflare Pages via Wrangler, and records the returned
  * `*.pages.dev` URL on the Client's Site Version pointer. Pure code: no AI, no

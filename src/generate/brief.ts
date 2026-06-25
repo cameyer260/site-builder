@@ -1,15 +1,17 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
+import { STAGE_TIER } from "../engine/tiers.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import { displayFieldValue, type Profile } from "../synthesize/profile.ts";
 import type { Logger } from "../util/log.ts";
 import { buildBriefPrompt } from "./prompts.ts";
 
 /**
- * **Design Brief** derivation (CONTEXT.md, build-plan Phase 5): a small engine
+ * **Design Brief** derivation (CONTEXT.md): a small engine
  * call that turns the Client Profile, logo (brand colors), and existing-site
  * screenshots into `sites/vN/brief.md` — one Site Version's explicit visual
  * direction, steerable via `--vibe`/`--style`. Best-effort: if the call fails
@@ -30,11 +32,27 @@ export interface DeriveBriefParams {
   style?: string;
   log: Logger;
   engine?: EngineRunner;
+  /** Resolved from RunContext; falls back to config.defaultEngine when absent (e.g. tests). */
+  engineKind?: EngineKind;
+  engineBin?: string;
+  modelFor?: (stage: string) => string;
 }
 
 export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
   const { paths, config, version, clientName, profile, vibe, style, log } = params;
   const engine = params.engine ?? runEngine;
+
+  // Resolve engine fields; fall back to config defaults so tests need not pass them.
+  const engineKind = params.engineKind ?? config.defaultEngine;
+  const engineProfile = config.engines[engineKind];
+  const engineBin = params.engineBin ?? engineProfile.bin;
+  const modelFor =
+    params.modelFor ??
+    ((stage: string) => {
+      const tier = STAGE_TIER[stage] ?? "best";
+      return engineProfile.models[tier];
+    });
+
   const versionDir = paths.versionDir(version);
   const briefMdPath = join(versionDir, "brief.md");
 
@@ -43,8 +61,9 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
   const screenshotsDir = join(paths.ingest, "site", "screenshots", "desktop");
 
   log.step("generate: deriving Design Brief");
-  const result = await engine(config.engineBin, {
+  const result = await engine(engineBin, {
     ...stageEngineDefaults(),
+    engine: engineKind,
     prompt: buildBriefPrompt({
       clientName,
       versionDir,
@@ -57,7 +76,8 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
     }),
     cwd: versionDir,
     addDirs: [paths.context, paths.ingest],
-    model: config.models.synthesize,
+    // Brief uses the small tier (synthesize key) — not generate/best (ADR-0010).
+    model: modelFor("synthesize"),
     maxBudgetUsd: BRIEF_BUDGET_USD,
     timeoutMs: BRIEF_TIMEOUT_MS,
     log,

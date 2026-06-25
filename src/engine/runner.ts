@@ -1,16 +1,15 @@
 import { spawn } from "node:child_process";
 import type { Logger } from "../util/log.ts";
-import type { McpConfig } from "./mcp.ts";
+import { ADAPTERS, type EngineAdapter, type EngineKind } from "./adapter.ts";
 
 /**
- * The `claude -p` engine runner (ADR-0001). Each AI stage is a fresh headless
- * invocation that reads prior stages' on-disk artifacts; there is no session
- * continuity to preserve. The prompt is fed on stdin (not as a positional) so
- * it can never be swallowed by a preceding variadic flag like `--add-dir`.
+ * Generic engine runner (ADR-0001/0010). Keeps all process lifecycle (spawn,
+ * process-group kill, timeout, drain) engine-agnostic; per-CLI invocation and
+ * result parsing are delegated to the ADAPTERS map. claudey is the default.
  *
- * Containment (file edits, bash) is delegated to the `claudey` wrapper in
- * production, so no permission flags are sent by default; the bypass options
- * exist only for running against a raw `claude` binary inside a sandbox.
+ * Containment (file edits, bash) is delegated to each CLI's wrapper by default,
+ * so no permission flags are sent here; the bypass option exists only for
+ * running against a raw binary inside a sandbox.
  */
 
 export type PermissionMode =
@@ -28,19 +27,8 @@ export interface StreamEvent {
   [key: string]: unknown;
 }
 
-interface ResultEvent extends StreamEvent {
-  type: "result";
-  is_error?: boolean;
-  result?: string;
-  session_id?: string;
-  num_turns?: number;
-  duration_ms?: number;
-  total_cost_usd?: number;
-  usage?: unknown;
-}
-
 /**
- * Quota telemetry the engine emits as a `rate_limit_event`. It fires on
+ * Quota telemetry the claudey engine emits as a `rate_limit_event`. It fires on
  * essentially every run as informational status (`status: "allowed"` or
  * `"allowed_warning"`), *not* only when throttled — so the mere presence of the
  * event says nothing. Only `status: "rejected"` means the request was actually
@@ -61,20 +49,18 @@ function isThrottled(event: RateLimitEvent): boolean {
 }
 
 export interface EngineOptions {
-  /** The user/stage prompt; delivered to the engine on stdin. */
+  /** The user/stage prompt; delivered to the engine per-adapter (stdin or positional). */
   prompt: string;
   /** Working directory the engine is scoped to (its primary tool-access root). */
   cwd: string;
+  /** Engine kind to dispatch to; defaults to `"claudey"`. */
+  engine?: EngineKind;
   /** Model alias ("opus"/"sonnet") or full id ("claude-opus-4-8"). */
   model?: string;
   /** Extra directories the engine may read/write (`--add-dir`). */
   addDirs?: string[];
-  /** Tool-orchestration directives appended to the system prompt. */
+  /** Tool-orchestration directives appended to the system prompt (claudey) or prepended to the prompt (codey/opencode). */
   appendSystemPrompt?: string;
-  /** MCP servers to load (e.g. the Playwright fallback). Object or raw JSON/path. */
-  mcpConfig?: McpConfig | string;
-  /** Ignore all other MCP sources, using only `mcpConfig`. */
-  strictMcpConfig?: boolean;
   /** Hard ceiling on spend for this invocation (`--max-budget-usd`). */
   maxBudgetUsd?: number;
   /** Don't persist the session to disk (stage runs are stateless). */
@@ -93,7 +79,7 @@ export interface EngineOptions {
    * After the engine reports a *rejected* rate limit, abort the run if it then
    * produces no output for this long — rather than waiting out the full
    * `timeoutMs`. Only armed once the engine is genuinely throttled, so a busy
-   * engine (e.g. a long, silent build) is never affected.
+   * engine (e.g. a long, silent build) is never affected. claudey-only.
    */
   rateLimitGraceMs?: number;
   /** Logger to tee a one-line trace of each stream event to. */
@@ -126,65 +112,47 @@ export interface EngineResult {
 }
 
 /**
- * Builds the engine argv (excluding the prompt, which goes on stdin). Pure and
- * order-stable so it can be asserted on directly in tests.
+ * Backward-compatible re-export: builds the claudey argv from engine options.
+ * Pure and order-stable so it can be asserted on directly in tests.
  */
 export function buildEngineArgs(opts: EngineOptions): string[] {
-  const args: string[] = ["--print", "--output-format", "stream-json", "--verbose"];
-
-  if (opts.addDirs && opts.addDirs.length > 0) {
-    args.push("--add-dir", ...opts.addDirs);
-  }
-  if (opts.mcpConfig !== undefined) {
-    const value =
-      typeof opts.mcpConfig === "string" ? opts.mcpConfig : JSON.stringify(opts.mcpConfig);
-    args.push("--mcp-config", value);
-    if (opts.strictMcpConfig) {
-      args.push("--strict-mcp-config");
-    }
-  }
-  if (opts.model) {
-    args.push("--model", opts.model);
-  }
-  if (opts.appendSystemPrompt) {
-    args.push("--append-system-prompt", opts.appendSystemPrompt);
-  }
-  if (opts.maxBudgetUsd !== undefined) {
-    args.push("--max-budget-usd", String(opts.maxBudgetUsd));
-  }
-  if (opts.noSessionPersistence) {
-    args.push("--no-session-persistence");
-  }
-  if (opts.permissionMode) {
-    args.push("--permission-mode", opts.permissionMode);
-  }
-  if (opts.dangerouslySkipPermissions) {
-    args.push("--dangerously-skip-permissions");
-  }
-  return args;
+  return ADAPTERS.claudey.buildInvocation(opts).args;
 }
 
-/** Parses line-delimited stream-json, tolerating blank and non-JSON lines. */
+/**
+ * Parses one line of stream-json into an event, or null for a blank/non-JSON
+ * line. The single shared parse primitive: the live streaming path (`runEngine`)
+ * and the batch `parseStreamJson` both go through it, so "what counts as an
+ * event" has exactly one definition.
+ */
+export function parseStreamLine(line: string): StreamEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed) as StreamEvent;
+  } catch {
+    // non-JSON noise (e.g. warnings) is ignored
+    return null;
+  }
+}
+
+/** Parses a full stream-json buffer, tolerating blank and non-JSON lines. */
 export function parseStreamJson(stdout: string): StreamEvent[] {
   const events: StreamEvent[] = [];
   for (const line of stdout.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-    try {
-      events.push(JSON.parse(trimmed) as StreamEvent);
-    } catch {
-      // non-JSON noise (e.g. warnings) is ignored
+    const event = parseStreamLine(line);
+    if (event) {
+      events.push(event);
     }
   }
   return events;
 }
 
 /**
- * Turns raw run outcomes into a success/failure verdict. A run is ok only when
- * a `result` event is present with `is_error` false and subtype `success`, and
- * the process exited cleanly.
+ * Backward-compatible re-export: turns raw run outcomes into a success/failure
+ * verdict using the claudey adapter's logic.
  */
 export function interpretResult(input: {
   events: StreamEvent[];
@@ -192,52 +160,7 @@ export function interpretResult(input: {
   spawnError?: string;
   stderrTail?: string;
 }): EngineResult {
-  const { events, exitCode, spawnError, stderrTail } = input;
-
-  const base = { events, exitCode, stderrTail, resultText: null, isError: true } as const;
-
-  if (spawnError) {
-    return { ...base, ok: false, error: spawnError };
-  }
-
-  const resultEvent = [...events].reverse().find((e) => e.type === "result") as
-    | ResultEvent
-    | undefined;
-  if (!resultEvent) {
-    return {
-      ...base,
-      ok: false,
-      error:
-        exitCode === 0
-          ? "engine produced no result event"
-          : `engine exited ${exitCode} with no result event`,
-    };
-  }
-
-  const isError =
-    resultEvent.is_error === true ||
-    (resultEvent.subtype !== undefined && resultEvent.subtype !== "success");
-  const ok = !isError && (exitCode === 0 || exitCode === null);
-
-  return {
-    ok,
-    resultText: typeof resultEvent.result === "string" ? resultEvent.result : null,
-    isError,
-    subtype: resultEvent.subtype,
-    sessionId: resultEvent.session_id,
-    numTurns: resultEvent.num_turns,
-    durationMs: resultEvent.duration_ms,
-    totalCostUsd: resultEvent.total_cost_usd,
-    usage: resultEvent.usage,
-    exitCode,
-    events,
-    stderrTail,
-    error: ok
-      ? undefined
-      : resultEvent.subtype && resultEvent.subtype !== "success"
-        ? `engine result subtype "${resultEvent.subtype}"`
-        : "engine reported an error",
-  };
+  return ADAPTERS.claudey.interpretResult(input);
 }
 
 /** Grace given to the engine's process tree to tear down on SIGTERM before we SIGKILL it. */
@@ -250,12 +173,13 @@ const KILL_GRACE_MS = 5_000;
 const EXIT_DRAIN_MS = 2_000;
 
 /**
- * Spawns the engine, streams stream-json events (teeing a trace to the logger),
- * feeds the prompt on stdin, and resolves with a parsed success/failure verdict.
+ * Spawns the engine, streams events (teeing a trace to the logger), delivers
+ * the prompt per-adapter, and resolves with a parsed success/failure verdict.
  * Never rejects: all failures are reported in the resolved EngineResult.
  */
 export function runEngine(engineBin: string, opts: EngineOptions): Promise<EngineResult> {
-  const args = buildEngineArgs(opts);
+  const adapter: EngineAdapter = ADAPTERS[opts.engine ?? "claudey"];
+  const { args, stdin } = adapter.buildInvocation(opts);
   const events: StreamEvent[] = [];
   let stdoutBuffer = "";
   let stderrTail = "";
@@ -319,13 +243,19 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
         ? setTimeout(() => terminate(`engine timed out after ${opts.timeoutMs}ms`), opts.timeoutMs)
         : null;
 
-    // Rate-limit stall watchdog: a throttled engine can sit silent for the full
-    // wall-clock `timeoutMs` (5–30 min). Once the engine reports a *rejected*
-    // rate limit, arm a much shorter deadline that any further output resets — a
-    // backoff that recovers is left alone, but one that goes quiet is abandoned
-    // fast. Never armed by the benign quota pings, so a busy engine is unaffected.
+    // Rate-limit stall watchdog: claudey-only (adapter.watchesRateLimit). A
+    // throttled claudey engine can sit silent for the full wall-clock `timeoutMs`
+    // (5–30 min). Once the engine reports a *rejected* rate limit, arm a much
+    // shorter deadline that any further output resets — a backoff that recovers is
+    // left alone, but one that goes quiet is abandoned fast. Never armed by the
+    // benign quota pings, so a busy engine is unaffected.
     const bumpRateLimitWatchdog = (): void => {
-      if (!rateLimited || settled || opts.rateLimitGraceMs === undefined) {
+      if (
+        !adapter.watchesRateLimit ||
+        !rateLimited ||
+        settled ||
+        opts.rateLimitGraceMs === undefined
+      ) {
         return;
       }
       if (rateLimitTimer) {
@@ -352,42 +282,37 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
       if (killReason && !spawnError) {
         spawnError = killReason;
       }
-      resolve(interpretResult({ events, exitCode: code, spawnError, stderrTail }));
+      resolve(adapter.interpretResult({ events, exitCode: code, spawnError, stderrTail }));
     };
 
     const ingestLine = (line: string): void => {
-      const trimmed = line.trim();
-      if (!trimmed) {
+      const event = parseStreamLine(line);
+      if (!event) {
         return;
       }
-      try {
-        const event = JSON.parse(trimmed) as StreamEvent;
-        events.push(event);
-        opts.onEvent?.(event);
-        if (event.type === "rate_limit_event") {
-          // Most of these are benign quota pings (status "allowed"); only a
-          // `rejected` status means the engine is genuinely blocked and may go
-          // silent waiting for the window to reset. Warn/arm the stall watchdog
-          // only then — otherwise this fires (falsely) on every run.
-          if (isThrottled(event as RateLimitEvent)) {
-            rateLimited = true;
-            bumpRateLimitWatchdog();
-            const graceNote =
-              opts.rateLimitGraceMs !== undefined
-                ? ` (aborts after ${Math.round(opts.rateLimitGraceMs / 1000)}s with no further output)`
-                : "";
-            opts.log?.warn(`engine rate limited by the API; waiting for it to clear${graceNote}`);
-          } else {
-            const status = (event as RateLimitEvent).rate_limit_info?.status ?? "unknown";
-            opts.log?.info(`engine rate_limit_event (${status})`);
-          }
+      events.push(event);
+      opts.onEvent?.(event);
+      if (adapter.watchesRateLimit && event.type === "rate_limit_event") {
+        // Most of these are benign quota pings (status "allowed"); only a
+        // `rejected` status means the engine is genuinely blocked and may go
+        // silent waiting for the window to reset. Warn/arm the stall watchdog
+        // only then — otherwise this fires (falsely) on every run.
+        if (isThrottled(event as RateLimitEvent)) {
+          rateLimited = true;
+          bumpRateLimitWatchdog();
+          const graceNote =
+            opts.rateLimitGraceMs !== undefined
+              ? ` (aborts after ${Math.round(opts.rateLimitGraceMs / 1000)}s with no further output)`
+              : "";
+          opts.log?.warn(`engine rate limited by the API; waiting for it to clear${graceNote}`);
         } else {
-          opts.log?.info(
-            `engine ${event.type ?? "event"}${event.subtype ? `:${event.subtype}` : ""}`,
-          );
+          const status = (event as RateLimitEvent).rate_limit_info?.status ?? "unknown";
+          opts.log?.info(`engine rate_limit_event (${status})`);
         }
-      } catch {
-        // non-JSON noise
+      } else {
+        opts.log?.info(
+          `engine ${event.type ?? "event"}${event.subtype ? `:${event.subtype}` : ""}`,
+        );
       }
     };
 
@@ -432,9 +357,12 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
       finish(code);
     });
 
-    // The prompt is delivered on stdin; swallow EPIPE if the child exits early.
+    // Deliver the prompt per-adapter: claudey uses stdin; codey/opencode use a
+    // positional arg (stdin is undefined) so we just close the pipe.
     child.stdin.on("error", () => {});
-    child.stdin.write(opts.prompt);
+    if (stdin !== undefined) {
+      child.stdin.write(stdin);
+    }
     child.stdin.end();
   });
 }

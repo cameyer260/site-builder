@@ -36,21 +36,23 @@ test("save/load round trip", () => {
   saveConfig(makeConfig("/tmp/clients"));
   const loaded = loadConfig();
   expect(loaded?.root).toBe("/tmp/clients");
-  expect(loaded?.engineBin).toBe("claudey");
-  expect(loaded?.models.generate).toBe(DEFAULTS.models.generate);
+  expect(loaded?.defaultEngine).toBe("claudey");
+  expect(loaded?.engines.claudey.models.best).toBe(DEFAULTS.engines.claudey.models.best);
 });
 
 test("get returns nested values", () => {
   const cfg = makeConfig("/tmp/clients");
   expect(getConfigValue(cfg, "viewports.desktop")).toBe(1440);
-  expect(getConfigValue(cfg, "models.synthesize")).toBe("claude-sonnet-4-6");
+  expect(getConfigValue(cfg, "engines.claudey.models.small")).toBe("claude-sonnet-4-6");
   expect(() => getConfigValue(cfg, "bogus")).toThrow();
 });
 
 test("set coerces numbers, validates, rejects unknown keys", () => {
   const cfg = makeConfig("/tmp/clients");
   expect(setConfigValue(cfg, "viewports.mobile", "414").viewports.mobile).toBe(414);
-  expect(setConfigValue(cfg, "engineBin", "claude").engineBin).toBe("claude");
+  expect(setConfigValue(cfg, "engines.claudey.bin", "claudey-custom").engines.claudey.bin).toBe(
+    "claudey-custom",
+  );
   expect(() => setConfigValue(cfg, "viewports.mobile", "abc")).toThrow();
   expect(() => setConfigValue(cfg, "pageCap", "-3")).toThrow();
   expect(() => setConfigValue(cfg, "nope", "x")).toThrow();

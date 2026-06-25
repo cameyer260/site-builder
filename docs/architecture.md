@@ -92,9 +92,7 @@ auth.
   its mounts), so the tool sends **no permission flags** by default. The blast
   radius is the container mount scope.
 - `stage.ts` scrubs nested-Claude env markers so a `claude -p` run launched from
-  inside Claude Code behaves. `mcp.ts` wires the Playwright MCP config as a
-  fallback for when the model needs to drive a browser itself (used small and
-  focused — see CONTEXT.md > Playwright MCP).
+  inside Claude Code behaves.
 
 ## Storage & state (`src/storage/`, ADR-0003)
 

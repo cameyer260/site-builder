@@ -57,17 +57,22 @@ export function saveConfig(cfg: Config): void {
 /** The settable leaf keys, with how a raw string value should be coerced. */
 const KEY_KINDS = {
   root: "string",
-  engineBin: "string",
+  defaultEngine: "string",
+  "engines.claudey.bin": "string",
+  "engines.claudey.models.best": "string",
+  "engines.claudey.models.small": "string",
+  "engines.codey.bin": "string",
+  "engines.codey.models.best": "string",
+  "engines.codey.models.small": "string",
+  "engines.opencode.bin": "string",
+  "engines.opencode.models.best": "string",
+  "engines.opencode.models.small": "string",
   wranglerBin: "string",
   ghBin: "string",
   pexelsApiKey: "string",
   "viewports.desktop": "number",
   "viewports.mobile": "number",
   pageCap: "number",
-  "models.generate": "string",
-  "models.audit": "string",
-  "models.synthesize": "string",
-  "models.assetClassification": "string",
 } as const;
 
 export type ConfigKey = keyof typeof KEY_KINDS;

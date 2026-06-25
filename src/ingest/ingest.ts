@@ -28,9 +28,9 @@ export interface IngestParams {
 }
 
 /**
- * The real `ingest` stage (build-plan Phase 2): gathers raw material from every
- * provided Input into the `ingest/` layout and writes `manifest.json`. Pure
- * code, no AI. The orchestrator has already cleared `ingest/` on resume.
+ * The real `ingest` stage: gathers raw material from every provided Input into
+ * the `ingest/` layout and writes `manifest.json`. Pure code, no AI. The
+ * orchestrator has already cleared `ingest/` on resume.
  */
 export async function runIngest(params: IngestParams): Promise<IngestManifest> {
   const { paths, inputs, config, pageCap, log } = params;

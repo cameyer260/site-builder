@@ -1,5 +1,10 @@
 # Engine: `claude -p` subprocess, not the Agent SDK
 
+> **Extended by [ADR-0010](./0010-pluggable-ai-cli-engines.md).** The subprocess
+> approach below is unchanged and still the design, but the Engine is now
+> pluggable: `claudey` is the default of three interchangeable CLIs (also `codey`
+> and `opencode`), each a one-shot subprocess behind a common adapter.
+
 The AI-heavy stages are invoked by shelling out to the `claude -p` (headless print mode) binary, rather than importing the Claude Agent SDK. This rides the developer's existing Claude Code subscription auth instead of metered Anthropic API-key billing, which is the primary cost constraint for this tool.
 
 Resumability is handled at the pipeline-stage level, not via Claude session continuity: each stage is a fresh `claude -p` invocation that reads the prior stages' on-disk artifacts as its context. There is no mid-conversation state to preserve, so the SDK's richer session model buys us nothing here.
@@ -14,7 +19,7 @@ This means autonomy is safe by construction: the spawned agent can edit files an
 
 ## Model per stage
 
-Model is chosen per stage to spend the subscription's usage where it moves quality, and configurable in `config.json`:
+Model is chosen per stage to spend the subscription's usage where it moves quality. This is expressed as a two-tier abstraction (a **best** tier and a **small** tier) with the stage→tier mapping fixed in code and each Engine's concrete models configurable in `config.json` (see ADR-0010):
 
-- **Opus 4.8** → `generate`, `audit` (creative build + judgment).
-- **Sonnet 4.6** → `synthesize`, asset-classification (structured extraction where Opus is overkill).
+- **best** → `generate`, `audit` (creative build + judgment). claudey: Opus 4.8.
+- **small** → `synthesize`, asset-classification (structured extraction where the best tier is overkill). claudey: Sonnet 4.6.

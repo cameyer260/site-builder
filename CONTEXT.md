@@ -1,6 +1,6 @@
 # Site Builder
 
-A CLI tool that generates working prototype websites for prospective freelance clients from whatever information is available about their business, for use as a fast outreach mechanism. It orchestrates deterministic code (crawling, screenshots, deploys) and headless Claude (`claude -p`) for the AI-heavy stages.
+A CLI tool that generates working prototype websites for prospective freelance clients from whatever information is available about their business, for use as a fast outreach mechanism. It orchestrates deterministic code (crawling, screenshots, deploys) and a configurable headless AI coding-agent CLI — the **Engine** — for the AI-heavy stages.
 
 ## Language
 
@@ -34,9 +34,6 @@ _Avoid_: scraper, browser tool
 A named browser size the screenshot component renders at — desktop (1440px) and mobile (390px) by default, both configurable. Every screenshotting step (ingest and audit) runs all profiles, so responsiveness is always captured.
 _Avoid_: breakpoint, device
 
-**Playwright MCP**:
-The Playwright MCP server exposed to `claude -p` so the model can drive a browser itself. Strictly a fallback, used small and focused on a single page, because letting the model roam the browser wastes tokens. Distinct from the Playwright script.
-
 ## Pipeline
 
 The tool runs a fixed sequence of six stages across two phases. Resume happens at stage boundaries.
@@ -64,7 +61,7 @@ Builds the Astro Site from the synthesized context, guided by skills and prompt-
 _Avoid_: build
 
 **Kit**:
-The hand-maintained, opinionated Astro + Tailwind starter copied into each new Site Version at the start of `generate`. Owns the quality floor — SEO/meta, accessibility, performance (Astro `<Image>`), responsiveness, design tokens, and component primitives. Sets the floor, not the look: its components are adaptable starting points, and per-Client visual identity comes from instruction to Claude, never baked in. Explicit non-goal: making every Site look the same.
+The hand-maintained, opinionated Astro + Tailwind starter copied into each new Site Version at the start of `generate`. Owns the quality floor — SEO/meta, accessibility, performance (Astro `<Image>`), responsiveness, design tokens, and component primitives. Sets the floor, not the look: its components are adaptable starting points, and per-Client visual identity comes from instruction to the Engine, never baked in. Explicit non-goal: making every Site look the same.
 _Avoid_: template, boilerplate, theme
 
 **Design Brief**:
@@ -80,6 +77,16 @@ _Avoid_: report, evidence, results
 
 **`deploy`**:
 Publishes the built Site to Cloudflare Pages via Wrangler Direct Upload (`wrangler pages deploy`) and returns a shareable `*.pages.dev` URL. No GitHub repo is involved. Pure code.
+
+## Engine
+
+**Engine**:
+The AI coding-agent CLI that runs the AI-heavy stages (`synthesize`, `generate`, `audit`) — one of three interchangeable, one-shot backends selected per run with `--engine`: **claudey** (the default), **codey**, and **opencode**. Each reads prior stages' on-disk artifacts (never a live session) and owns its own invocation dialect, Model tiers, and result parsing behind a common adapter. claudey is the design-quality default; the selection is per-run and is not persisted across resume.
+_Avoid_: backend, provider, agent, "Claude" (the Engine may not be Claude)
+
+**Model tier**:
+The engine-agnostic two-level model assignment every Engine fills — **best** (judgment/creative work: `generate`, `audit`) and **small** (structured extraction: `synthesize`, asset classification). The stage→tier mapping is fixed in code; each Engine supplies its own model for each tier (e.g. claudey best=Opus/small=Sonnet, codey best=gpt-5.5/small=gpt-5.4-mini) and always runs at a fixed high reasoning effort (claudey/codey `xhigh`, opencode `max` variant), regardless of tier.
+_Avoid_: model role, size, level
 
 ## Context & Profile
 
@@ -108,5 +115,5 @@ A media file (chiefly an image) downloaded from the Client's existing site durin
 A tool-provided default (e.g. a generic logo) used in the generated Site when the corresponding required Asset was not found among the Client's downloaded Assets.
 
 **Image sourcing**:
-The three-tier rule for non-logo imagery during `generate`: (1) the Client's real captured Assets when good enough; (2) **Pexels** stock fetched at generate time — Claude declares each slot's intent and search keywords, code does the fetch/download and hands files to Astro `<Image>`; (3) the curated Fallback Asset pack for offline / no-API-key. Tier 2 needs a Pexels API key (managed by `sb config`).
+The three-tier rule for non-logo imagery during `generate`: (1) the Client's real captured Assets when good enough; (2) **Pexels** stock fetched at generate time — the Engine declares each slot's intent and search keywords, code does the fetch/download and hands files to Astro `<Image>`; (3) the curated Fallback Asset pack for offline / no-API-key. Tier 2 needs a Pexels API key (managed by `sb config`).
 _Avoid_: placeholder, media library

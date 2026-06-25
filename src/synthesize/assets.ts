@@ -7,7 +7,7 @@ import type { Logger } from "../util/log.ts";
 import type { AssetManifestEntry } from "./profile.ts";
 
 /**
- * Asset classification + reconciliation (build-plan Phase 3, call A). The vision
+ * Asset classification + reconciliation (call A of synthesize). The vision
  * model classifies the captured image Assets into `context/assets.json`; this
  * module turns that into the canonical asset set under `context/assets/`,
  * dropping in a Fallback Asset for any required Asset (the logo) that's missing.

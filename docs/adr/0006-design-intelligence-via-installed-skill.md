@@ -6,6 +6,7 @@
 
 **Consequences.**
 - The tool assumes `ui-ux-pro-max` (and its Python/Node script dependencies) is present on the machine running `sb`. This is an accepted, non-portable runtime dependency.
+- With pluggable Engines (ADR-0010), the skill must be installed and invocable **by name in whichever harness the selected Engine runs in** — not only Claude Code, but also codey's (`~/.codex`) and opencode's skill systems. The prompts name the skill engine-agnostically; an Engine whose harness lacks it silently degrades to the model's own design sense.
 - The tool's own `--append-system-prompt` is therefore thin: only tool-orchestration directives (use the Kit, honor the Design Brief + Client Profile, invoke `ui-ux-pro-max`, output constraints) — not re-derived design theory.
 - Brand-color extraction from the captured logo can reuse the skill's `brand/extract-colors` approach.
 

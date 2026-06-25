@@ -2,8 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildSite, ensureBuiltDist, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
+import { STAGE_TIER } from "../engine/tiers.ts";
 import { profilesFromConfig } from "../playwright/screenshot.ts";
 import type { Client } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
@@ -21,7 +23,7 @@ import {
 import { AUDIT_SYSTEM_PROMPT, buildAuditPrompt } from "./prompts.ts";
 
 /**
- * The real `audit` stage (build-plan Phase 6, ADR-0007). Against the locally
+ * The real `audit` stage (ADR-0007). Against the locally
  * built Site it: (1) ensures the Site is built, (2) serves it and runs the
  * deterministic fix-drivers (screenshots, axe-core, broken-link/asset check)
  * into `audit/checks.json`, (3) has the engine review + apply ONE fix pass
@@ -51,12 +53,27 @@ export interface AuditParams {
   inspect?: SiteInspector;
   /** Injected Lighthouse Scorecard runner (tests stub it); defaults to the real one. */
   lighthouse?: LighthouseRunner;
+  /** Resolved from RunContext; falls back to config.defaultEngine when absent (e.g. tests). */
+  engineKind?: EngineKind;
+  engineBin?: string;
+  modelFor?: (stage: string) => string;
 }
 
 export async function runAudit(params: AuditParams): Promise<void> {
   const { paths, config, version, client, log } = params;
   const engine = params.engine ?? runEngine;
   const compile = params.buildSite ?? buildSite;
+
+  // Resolve engine fields; fall back to config defaults so tests need not pass them.
+  const engineKind = params.engineKind ?? config.defaultEngine;
+  const engineProfile = config.engines[engineKind];
+  const engineBin = params.engineBin ?? engineProfile.bin;
+  const modelFor =
+    params.modelFor ??
+    ((stage: string) => {
+      const tier = STAGE_TIER[stage] ?? "best";
+      return engineProfile.models[tier];
+    });
   const inspect = params.inspect ?? inspectBuiltSite;
   const lighthouse = params.lighthouse ?? runLighthouseScorecard;
 
@@ -90,8 +107,9 @@ export async function runAudit(params: AuditParams): Promise<void> {
 
   // 3. AI review + one fix pass → audit/audit.md + edits to the Site source.
   log.step("audit: AI review + fix pass (this can take several minutes)");
-  const review = await engine(config.engineBin, {
+  const review = await engine(engineBin, {
     ...stageEngineDefaults(),
+    engine: engineKind,
     prompt: buildAuditPrompt({
       clientName: client.name,
       checksJsonPath: "audit/checks.json",
@@ -103,7 +121,7 @@ export async function runAudit(params: AuditParams): Promise<void> {
     cwd: versionDir,
     addDirs: [paths.context],
     appendSystemPrompt: AUDIT_SYSTEM_PROMPT,
-    model: config.models.audit,
+    model: modelFor("audit"),
     maxBudgetUsd: AUDIT_BUDGET_USD,
     timeoutMs: AUDIT_TIMEOUT_MS,
     log,

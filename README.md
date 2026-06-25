@@ -6,10 +6,12 @@ mechanism. Point it at an existing site, a few documents, or just some notes, an
 it crawls, profiles, designs, builds, audits, and deploys a tailored
 [Astro](https://astro.build) site, handing back a shareable `*.pages.dev` link.
 
-It orchestrates deterministic code (crawl, screenshots, deploy) and headless
-Claude (`claude -p`, via the `claudey` container wrapper) for the AI-heavy
-stages. Subscription auth, not a metered API key (see
-[ADR-0001](docs/adr/0001-claude-p-subprocess-engine.md)).
+It orchestrates deterministic code (crawl, screenshots, deploy) and a
+pluggable headless coding-agent CLI for the AI-heavy stages — **`claudey`**
+(default), **`codey`** (Codex), or **`opencode`**; select with `--engine`.
+Subscription auth, not a metered API key (see
+[ADR-0001](docs/adr/0001-claude-p-subprocess-engine.md) and
+[ADR-0010](docs/adr/0010-pluggable-ai-cli-engines.md)).
 
 > **The core promise:** `sb build <name> --url …` → a live link. One command,
 > Inputs in, deployed prototype out.
@@ -20,11 +22,15 @@ stages. Subscription auth, not a metered API key (see
 
 - **[Bun](https://bun.sh) 1.3+** — the runtime. TypeScript runs directly; there
   is no build step.
-- **The `claudey` wrapper** — `claude -p` running in a Docker container with
-  bypass-permissions. This is the AI engine; the tool shells out to it so the
-  blast radius is the container's mount scope, not your machine. The engine
-  binary is configurable (`engineBin`), but `claudey` is the default and the
-  supported path.
+- **An AI engine** — one of:
+  - **`claudey`** *(default)* — `claude -p` in a Docker container with
+    bypass-permissions. Blast radius is the container's mount scope.
+  - **`codey`** — Codex (`codex exec`). Requires `codey` on PATH.
+  - **`opencode`** — `opencode run`. Requires `opencode` on PATH.
+
+  Each engine uses its own subscription auth; no metered API key. The default
+  engine is `claudey`; override per-run with `--engine <kind>` or change the
+  default with `sb config set defaultEngine <kind>`.
 - **[Wrangler](https://developers.cloudflare.com/workers/wrangler/)**, logged in
   (`wrangler login`) — the Cloudflare Pages deploy.
 - **[Astro](https://astro.build) toolchain** — pulled in per Site Version via
@@ -37,9 +43,9 @@ Optional:
   pack (see [Image sourcing](CONTEXT.md)).
 - **The [GitHub CLI](https://cli.github.com/) (`gh`)**, authed — only for the
   opt-in `--github` / `sb push` flow. Deploy never needs it.
-- **The `ui-ux-pro-max` skill** installed in the engine — supplies design
-  intelligence (palettes, fonts, a11y guardrails) at generate time
-  ([ADR-0006](docs/adr/0006-design-intelligence-via-installed-skill.md)).
+- **The `ui-ux-pro-max` skill** installed in whichever engine you're using —
+  supplies design intelligence (palettes, fonts, a11y guardrails) at generate
+  time ([ADR-0006](docs/adr/0006-design-intelligence-via-installed-skill.md)).
 
 ---
 
@@ -118,9 +124,12 @@ domain vocabulary, **[CONTEXT.md](CONTEXT.md)**.
 | `sb config set <key> <value>` | Update one config value (re-validated). |
 | `sb config path` | Print the config file path. |
 
-Settable keys: `root`, `engineBin`, `wranglerBin`, `ghBin`, `pexelsApiKey`,
-`viewports.desktop`, `viewports.mobile`, `pageCap`, `models.generate`,
-`models.audit`, `models.synthesize`, `models.assetClassification`.
+Settable keys: `root`, `defaultEngine`, `engines.claudey.bin`,
+`engines.claudey.models.best`, `engines.claudey.models.small`,
+`engines.codey.bin`, `engines.codey.models.best`, `engines.codey.models.small`,
+`engines.opencode.bin`, `engines.opencode.models.best`,
+`engines.opencode.models.small`, `wranglerBin`, `ghBin`, `pexelsApiKey`,
+`viewports.desktop`, `viewports.mobile`, `pageCap`.
 
 ### `build` — the smart verb
 
@@ -153,6 +162,12 @@ its recorded Inputs):
 > may be a later `resume` or `--refresh` from a different directory. Prefer
 > absolute paths so they survive those re-runs.
 
+**Engine flag:**
+
+- `--engine <kind>` — override the default engine for this run (`claudey`, `codey`, `opencode`).
+  Defaults to the `defaultEngine` config value. Not persisted; a later `resume` without
+  `--engine` uses `defaultEngine`.
+
 **Generation flags:**
 
 - `--vibe <text>` — steer the Design Brief's **mood/feeling** (e.g. `--vibe "calm, trustworthy"`).
@@ -174,7 +189,7 @@ its recorded Inputs):
 ### `variant` — another take
 
 ```
-sb variant <client> [--vibe <text>] [--style <text>] [--github] [--yes]
+sb variant <client> [--engine <kind>] [--vibe <text>] [--style <text>] [--github] [--yes]
 ```
 
 Forks a **new Site Version** from the existing Context-phase output — no
@@ -184,7 +199,7 @@ audit → deploy` into a fresh `vN+1`.
 ### `resume` — finish a failed run
 
 ```
-sb resume <client> [--vibe <text>] [--style <text>] [--yes]
+sb resume <client> [--engine <kind>] [--vibe <text>] [--style <text>] [--yes]
 ```
 
 Strictly continues the latest run from its first unfinished stage. Clears that
@@ -320,14 +335,21 @@ it.
 | Key | Default | Notes |
 |---|---|---|
 | `root` | *(required, prompted)* | Where Client folders live. |
-| `engineBin` | `claudey` | The `claude -p` container wrapper. |
+| `defaultEngine` | `claudey` | Engine used when `--engine` is not passed. |
+| `engines.claudey.bin` | `claudey` | Binary for the claudey engine. |
+| `engines.claudey.models.best` | `claude-opus-4-8` | generate + audit (best tier). |
+| `engines.claudey.models.small` | `claude-sonnet-4-6` | synthesize + assetClassification (small tier). |
+| `engines.codey.bin` | `codey` | Binary for the codey engine. |
+| `engines.codey.models.best` | `gpt-5.5` | generate + audit. |
+| `engines.codey.models.small` | `gpt-5.4-mini` | synthesize + assetClassification. |
+| `engines.opencode.bin` | `opencode` | Binary for the opencode engine. |
+| `engines.opencode.models.best` | `openrouter/moonshotai/kimi-k2.7-code` | generate + audit. |
+| `engines.opencode.models.small` | `openrouter/deepseek/deepseek-v4-flash` | synthesize + assetClassification. |
 | `wranglerBin` | `wrangler` | Cloudflare deploy. |
 | `ghBin` | `gh` | Only for `--github` / `sb push`. |
 | `pexelsApiKey` | *(unset)* | Enables tier-2 stock imagery. |
 | `viewports.desktop` / `viewports.mobile` | `1440` / `390` | Screenshot Viewport Profiles. |
 | `pageCap` | `10` | Default crawl cap; override per run with `--pages`. |
-| `models.generate` / `models.audit` | `claude-opus-4-8` | Creative build + judgment. |
-| `models.synthesize` / `models.assetClassification` | `claude-sonnet-4-6` | Structured extraction. |
 
 ---
 
@@ -336,9 +358,8 @@ it.
 **`Site Builder is not configured yet`** — run `sb config`.
 
 **`config doctor` shows `✗ engine (claudey): not found on PATH`** — install the
-`claudey` wrapper (or point `engineBin` at your `claude -p` binary with
-`sb config set engineBin <path>`). Auth is delegated to the wrapper, so doctor
-only checks presence.
+`claudey` wrapper (or point the binary with `sb config set engines.claudey.bin <path>`).
+Auth is delegated to each engine's wrapper; `doctor` only checks presence.
 
 **`✗ wrangler auth: not authenticated`** — run `wrangler login`. Deploy can't
 publish without it.
@@ -381,8 +402,7 @@ at least one of `--url`, `--docs`, `--images`, `--notes`.
 - **[docs/kit.md](docs/kit.md)** — the curated Astro Kit that sets the quality
   floor.
 - **[docs/adr/](docs/adr/)** — the binding architectural decisions.
-- **[docs/build-plan.md](docs/build-plan.md)** / **[docs/roadmap.md](docs/roadmap.md)**
-  — phase order, and what's explicitly out of scope for v1.
+- **[docs/roadmap.md](docs/roadmap.md)** — what's explicitly out of scope for v1.
 
 ```bash
 bun test            # all tests

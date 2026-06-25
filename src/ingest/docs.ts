@@ -4,7 +4,7 @@ import mammoth from "mammoth";
 import { extractText, getDocumentProxy } from "unpdf";
 
 /**
- * Document text extraction (CONTEXT.md > Input; build-plan Phase 2). v1 handles
+ * Document text extraction (CONTEXT.md > Input). v1 handles
  * digital PDF, Word (.docx), and plain text/Markdown by code — no AI, no OCR
  * (scanned-PDF OCR is deferred in the roadmap).
  *

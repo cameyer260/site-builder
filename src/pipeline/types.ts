@@ -3,6 +3,7 @@ import type { SiteInspector } from "../audit/inspect.ts";
 import type { LighthouseRunner } from "../audit/lighthouse.ts";
 import type { Config } from "../config/schema.ts";
 import type { DeployRunner } from "../deploy/wrangler.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import type { EngineRunner } from "../engine/runner.ts";
 import type { ClientInputs } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
@@ -29,6 +30,17 @@ export interface RunContext {
    * to write `client.json`; absent on resume (the record already exists).
    */
   inputs?: ClientInputs;
+
+  /** Resolved engine kind for this run (from `--engine` flag or `config.defaultEngine`). */
+  engineKind: EngineKind;
+  /** Resolved engine binary path for this run. */
+  engineBin: string;
+  /**
+   * Returns the model id for a given stage name, resolved via the fixed
+   * STAGE_TIER table and the active engine's model pair (ADR-0010).
+   */
+  modelFor: (stage: string) => string;
+
   /**
    * Engine runner for the AI stages. Left unset in production (stages default
    * to the real `runEngine`); tests inject a fake to stay offline.

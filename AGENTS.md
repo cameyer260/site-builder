@@ -5,8 +5,9 @@ This is the canonical instruction file; `CLAUDE.md` points here.
 
 Site Builder is a Bun + TypeScript CLI (`sb`) that generates working prototype
 Astro websites for prospective freelance clients. It orchestrates deterministic
-code (crawl, screenshots, deploy) and headless Claude (`claude -p`) for the
-AI-heavy stages.
+code (crawl, screenshots, deploy) and a configurable headless AI coding-agent
+CLI — the **Engine** (`claudey` by default, or `codey`/`opencode` via `--engine`)
+— for the AI-heavy stages.
 
 ## Read these first
 
@@ -22,10 +23,10 @@ AI-heavy stages.
   Lighthouse as evidence, not a gate), 0008 (smart-build decision table +
   CRM/GitHub continuation operations), 0009 (idiomatic functional TS over
   literal OO-SOLID — cleanups are DRY/consistency behind a frozen behavioral
-  contract, not re-architecture).
-- **`docs/build-plan.md`** — phase order (0–9) and milestones. **`docs/roadmap.md`**
-  — what is *explicitly out of scope for v1*; don't build these without being asked.
-- **`NOTES.md`** — current open TODOs.
+  contract, not re-architecture), 0010 (pluggable Engines: `claudey`/`codey`/
+  `opencode` behind a per-CLI adapter, selected per run with `--engine`).
+- **`docs/roadmap.md`** — what is *explicitly out of scope for v1*; don't build these
+  without being asked.
 
 ## Commands
 
@@ -37,7 +38,7 @@ bun test -t "resume"          # tests matching a name pattern
 bun run lint                  # biome check (lint + format check)
 bun run lint:fix              # biome autofix
 bun run typecheck             # tsc --noEmit
-bun run engine:smoke          # exercise the real claude -p engine end-to-end
+bun run engine:smoke          # exercise the engine end-to-end (add --engine <kind> for codey/opencode)
 ```
 
 Runtime is **Bun**, not Node. TypeScript runs directly; intra-repo imports use
@@ -73,14 +74,26 @@ stages' on-disk artifacts as its input. On resume the failed stage's own
 `outputs()` are deleted (clear-own-output) while earlier artifacts are kept
 (keep-prior). A stage's `outputs()` must **never** include a `state.json`.
 
-**The engine** (`src/engine/`, ADR-0001). AI stages shell out to the `claudey`
-wrapper (`claude -p` in a container) — *not* the Agent SDK and *not* a metered
-API key — to ride the developer's subscription auth. `runEngine` spawns it,
-feeds the prompt on **stdin** (never a positional), and parses `stream-json` into
-a success/failure verdict; it never rejects. Model is chosen **per stage**
-(`config.models`): Opus for generate/audit, Sonnet for synthesize/asset
-classification. Containment is delegated to `claudey`, so no permission flags are
-sent by default. `src/engine/stage.ts` scrubs nested-Claude env markers.
+**The Engine** (`src/engine/`, ADR-0001/0010). AI stages shell out to a headless
+coding-agent CLI — *not* an SDK and *not* a metered API key — to ride the
+developer's subscription auth. The Engine is **pluggable**: `--engine` selects one
+of three interchangeable one-shot CLIs (default `claudey`; also `codey` and
+`opencode`), each behind a per-CLI adapter in `ADAPTERS` that owns its invocation
+dialect (claudey `-p` + prompt on **stdin**; codey `exec` + positional prompt;
+opencode `run`), system-prompt delivery (`--append-system-prompt` for claudey;
+prepended to the prompt for codey and opencode), effort flag (claudey/codey
+`--effort xhigh`; opencode `--variant max`), and result parsing (claudey `stream-json`
+`result` event + rate-limit watchdog;
+codey/opencode `--json`/`--format json` terminal event + non-zero exit). `runEngine`
+keeps all process lifecycle (spawn, process-group kill, timeout, drain) generic and
+never rejects. Models are a two-tier abstraction — `best` (generate/audit) and
+`small` (synthesize/asset classification) — with a fixed stage→tier table in code and
+each Engine's concrete ids in `config.engines.<kind>.models`. The per-run selection
+lives on `RunContext` (config holds only `defaultEngine` + per-engine reference data)
+and is **not** persisted across resume. Containment is delegated to each wrapper, so
+no permission flags are sent by default; `src/engine/stage.ts` scrubs a single
+combined list of nested-session env markers (`NESTED_AGENT_MARKERS` — Claude + Codex
++ OpenCode) before every spawn.
 
 **Storage & state** (`src/storage/`, ADR-0003). The Root directory of per-Client
 folders *is* the registry — no central index file; CRM reads scan

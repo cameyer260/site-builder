@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import pc from "picocolors";
 import { loadConfigOrThrow } from "../config/store.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { runPush } from "../github/push.ts";
 import { runVariant } from "../pipeline/orchestrator.ts";
 import { stageNamesFor } from "../pipeline/pipeline.ts";
@@ -9,7 +10,8 @@ import { clientExists, clientPaths, nextVersion } from "../storage/layout.ts";
 import { readState } from "../storage/state.ts";
 import { UserError } from "../util/errors.ts";
 
-const USAGE = "usage: sb variant <client> [--vibe <text>] [--style <text>] [--github] [--yes]";
+const USAGE =
+  "usage: sb variant <client> [--engine <kind>] [--vibe <text>] [--style <text>] [--github] [--yes]";
 
 /**
  * `sb variant` — run the Generation phase only, into a *new* Site Version
@@ -23,6 +25,7 @@ export async function variantCommand(args: string[]): Promise<number> {
     args,
     allowPositionals: true,
     options: {
+      engine: { type: "string" },
       vibe: { type: "string" },
       style: { type: "string" },
       github: { type: "boolean" },
@@ -52,6 +55,15 @@ export async function variantCommand(args: string[]): Promise<number> {
     );
   }
 
+  const engineKinds = ["claudey", "codey", "opencode"] as const;
+  if (values.engine !== undefined && !(engineKinds as readonly string[]).includes(values.engine)) {
+    throw new UserError(
+      `unknown engine: "${values.engine}"`,
+      `valid engines: ${engineKinds.join(", ")}`,
+    );
+  }
+  const engineKind = values.engine as EngineKind | undefined;
+
   const version = nextVersion(paths.sites);
   const interactive = Boolean(process.stdin.isTTY) && !values.yes;
   const ctx = buildRunContext({
@@ -59,6 +71,7 @@ export async function variantCommand(args: string[]): Promise<number> {
     name,
     version,
     command: "variant",
+    engine: engineKind,
     interactive,
     vibe: values.vibe,
     style: values.style,

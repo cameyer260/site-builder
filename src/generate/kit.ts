@@ -7,7 +7,7 @@ import type { Logger } from "../util/log.ts";
 
 /**
  * Copying the curated **Kit** into a Site Version and seeding its git history
- * (build-plan Phase 5, ADR-0005). The Kit sets the quality floor; the AI build
+ * (ADR-0005). The Kit sets the quality floor; the AI build
  * then tailors the copy. Each Site Version is its own git repo so incremental
  * refinements live in that version's history (CONTEXT.md > Site Version).
  */

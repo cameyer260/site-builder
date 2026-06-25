@@ -1,18 +1,21 @@
 import { parseArgs } from "node:util";
 import pc from "picocolors";
 import { loadConfigOrThrow } from "../config/store.ts";
+import type { EngineKind } from "../engine/adapter.ts";
 import { resumePipeline, resumeVersion } from "../pipeline/orchestrator.ts";
 import { buildRunContext } from "../runtime.ts";
 import { clientExists, clientPaths } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 
-const USAGE = "usage: sb resume <client> [--vibe <text>] [--style <text>] [--yes]";
+const USAGE =
+  "usage: sb resume <client> [--engine <kind>] [--vibe <text>] [--style <text>] [--yes]";
 
 export async function resumeCommand(args: string[]): Promise<number> {
   const { positionals, values } = parseArgs({
     args,
     allowPositionals: true,
     options: {
+      engine: { type: "string" },
       vibe: { type: "string" },
       style: { type: "string" },
       yes: { type: "boolean", short: "y" },
@@ -33,12 +36,22 @@ export async function resumeCommand(args: string[]): Promise<number> {
   const paths = clientPaths(config.root, name);
   const version = resumeVersion(paths);
 
+  const engineKinds = ["claudey", "codey", "opencode"] as const;
+  if (values.engine !== undefined && !(engineKinds as readonly string[]).includes(values.engine)) {
+    throw new UserError(
+      `unknown engine: "${values.engine}"`,
+      `valid engines: ${engineKinds.join(", ")}`,
+    );
+  }
+  const engineKind = values.engine as EngineKind | undefined;
+
   const interactive = Boolean(process.stdin.isTTY) && !values.yes;
   const ctx = buildRunContext({
     config,
     name,
     version,
     command: "resume",
+    engine: engineKind,
     interactive,
     vibe: values.vibe,
     style: values.style,
