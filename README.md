@@ -338,7 +338,7 @@ it.
 | `defaultEngine` | `claudey` | Engine used when `--engine` is not passed. |
 | `engines.claudey.bin` | `claudey` | Binary for the claudey engine. |
 | `engines.claudey.models.best` | `claude-opus-4-8` | generate + audit + synthesize (best tier). |
-| `engines.claudey.models.small` | `claude-sonnet-4-6` | assetClassification + Design Brief (small tier). |
+| `engines.claudey.models.small` | `claude-sonnet-5` | assetClassification + Design Brief (small tier). |
 | `engines.codey.bin` | `codey` | Binary for the codey engine. |
 | `engines.codey.models.best` | `gpt-5.5` | generate + audit + synthesize. |
 | `engines.codey.models.small` | `gpt-5.4-mini` | assetClassification + Design Brief. |

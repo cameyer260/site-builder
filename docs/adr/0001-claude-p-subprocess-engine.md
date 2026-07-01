@@ -22,4 +22,4 @@ This means autonomy is safe by construction: the spawned agent can edit files an
 Model is chosen per stage to spend the subscription's usage where it moves quality. This is expressed as a two-tier abstraction (a **best** tier and a **small** tier) with the stage→tier mapping fixed in code and each Engine's concrete models configurable in `config.json` (see ADR-0010):
 
 - **best** → `generate`, `audit`, `synthesize` (creative build, judgment, and deep-research synthesis). claudey: Opus 4.8.
-- **small** → asset-classification and the `generate` Design Brief derivation (lightweight structured extraction). claudey: Sonnet 4.6.
+- **small** → asset-classification and the `generate` Design Brief derivation (lightweight structured extraction). claudey: Sonnet 5.

@@ -40,7 +40,7 @@ export const ConfigSchema = z.object({
       opencode: EngineProfileSchema,
     })
     .default({
-      claudey: { bin: "claudey", models: { best: "claude-opus-4-8", small: "claude-sonnet-4-6" } },
+      claudey: { bin: "claudey", models: { best: "claude-opus-4-8", small: "claude-sonnet-5" } },
       codey: { bin: "codey", models: { best: "gpt-5.5", small: "gpt-5.4-mini" } },
       opencode: {
         bin: "opencode",
@@ -69,7 +69,7 @@ export type Config = z.infer<typeof ConfigSchema>;
 export const DEFAULTS: Omit<Config, "root" | "pexelsApiKey"> = {
   defaultEngine: "claudey" as EngineKind,
   engines: {
-    claudey: { bin: "claudey", models: { best: "claude-opus-4-8", small: "claude-sonnet-4-6" } },
+    claudey: { bin: "claudey", models: { best: "claude-opus-4-8", small: "claude-sonnet-5" } },
     codey: { bin: "codey", models: { best: "gpt-5.5", small: "gpt-5.4-mini" } },
     opencode: {
       bin: "opencode",

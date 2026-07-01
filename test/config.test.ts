@@ -43,7 +43,7 @@ test("save/load round trip", () => {
 test("get returns nested values", () => {
   const cfg = makeConfig("/tmp/clients");
   expect(getConfigValue(cfg, "viewports.desktop")).toBe(1440);
-  expect(getConfigValue(cfg, "engines.claudey.models.small")).toBe("claude-sonnet-4-6");
+  expect(getConfigValue(cfg, "engines.claudey.models.small")).toBe("claude-sonnet-5");
   expect(() => getConfigValue(cfg, "bogus")).toThrow();
 });
 
