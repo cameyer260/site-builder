@@ -85,7 +85,7 @@ The AI coding-agent CLI that runs the AI-heavy stages (`synthesize`, `generate`,
 _Avoid_: backend, provider, agent, "Claude" (the Engine may not be Claude)
 
 **Model tier**:
-The engine-agnostic two-level model assignment every Engine fills — **best** (judgment/creative work: `generate`, `audit`) and **small** (structured extraction: `synthesize`, asset classification). The stage→tier mapping is fixed in code; each Engine supplies its own model for each tier (e.g. claudey best=Opus/small=Sonnet, codey best=gpt-5.5/small=gpt-5.4-mini) and always runs at a fixed high reasoning effort (claudey/codey `xhigh`, opencode `max` variant), regardless of tier.
+The engine-agnostic two-level model assignment every Engine fills — **best** (judgment/creative/deep-research work: `generate`, `audit`, `synthesize`) and **small** (lightweight structured extraction: asset classification, Design Brief derivation). The stage→tier mapping is fixed in code; each Engine supplies its own model for each tier (e.g. claudey best=Opus/small=Sonnet, codey best=gpt-5.5/small=gpt-5.4-mini) and always runs at a fixed high reasoning effort (claudey/codey `xhigh`, opencode `max` variant), regardless of tier.
 _Avoid_: model role, size, level
 
 ## Context & Profile
@@ -103,7 +103,7 @@ The provenance flag every Profile answer carries: **Known** (from real inputs or
 _Avoid_: confidence, certainty
 
 **QA session**:
-An optional interactive gate between the Context and Generation phases. Surfaces each Unknown Checklist item for the user to answer or skip; skipped items become Guessed values filled by AI, so a complete, deployable prototype can still be produced. Skipped entirely (non-interactive run) → all unknowns become Guessed.
+An optional interactive gate between the Context and Generation phases. Surfaces every Unknown and every Guessed Checklist item for the operator to answer or verify — answered items become Known (user-provided), skipped/cancelled Guessed items stay Guessed, and skipped Unknown items become Guessed, so a complete, deployable prototype can still be produced. Skipped entirely (non-interactive run) → all unknowns become Guessed.
 _Avoid_: interview, wizard
 
 ## Assets

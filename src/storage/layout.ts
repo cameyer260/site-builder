@@ -108,3 +108,20 @@ export function nextVersion(sitesDir: string): number {
 export function isDir(dir: string): boolean {
   return existsSync(dir) && statSync(dir).isDirectory();
 }
+
+/**
+ * Marker file `generate` writes into a Site Version's dir only after its
+ * compile gate passes. Its presence means the version built to completion and
+ * must never be regenerated over (ADR — Site Version overwrite protection).
+ */
+export const GENERATED_MARKER = ".generated";
+
+/** Path to `version`'s completion marker under `paths`. */
+export function versionMarkerPath(paths: ClientPaths, version: number): string {
+  return join(paths.versionDir(version), GENERATED_MARKER);
+}
+
+/** Whether Site Version `version` under `paths` already built to completion. */
+export function isVersionBuilt(paths: ClientPaths, version: number): boolean {
+  return existsSync(versionMarkerPath(paths, version));
+}

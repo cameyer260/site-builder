@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
@@ -9,7 +9,7 @@ import { runVariant, smartBuild } from "../src/pipeline/orchestrator.ts";
 import type { RunContext } from "../src/pipeline/types.ts";
 import { type ClientInputs, ClientInputsSchema, readClient } from "../src/storage/client.ts";
 import { clientPaths } from "../src/storage/layout.ts";
-import { readState } from "../src/storage/state.ts";
+import { readState, writeState } from "../src/storage/state.ts";
 import { createLogger } from "../src/util/log.ts";
 import { fakeInspect, fakeLighthouse } from "./fixtures/fake-audit-tools.ts";
 import { fakeDeploy } from "./fixtures/fake-deploy.ts";
@@ -141,6 +141,52 @@ test("a refresh that fails before generation resumes into its target Version, no
   expect(existsSync(paths.versionDir(1))).toBe(true);
   expect(existsSync(paths.versionDir(2))).toBe(true);
   expect(readClient(paths.clientJson)?.sites.map((s) => s.version)).toEqual([1, 2]);
+});
+
+test("a context resume that mis-resolves to a completed Site Version is refused, not overwritten", async () => {
+  // The real-world regression: a complete v1 exists, then the Context phase was
+  // re-run and left `synthesize` failed — but the new-version intent
+  // (`targetVersion`) was never durably recorded (the on-disk state.json we
+  // recovered had no such field). A plain continue then resolves back to v1 and,
+  // pre-fix, regenerated over it. It must now refuse and leave v1 untouched.
+  await smartBuild(makeCtx("Iota"), { refresh: false });
+  const paths = clientPaths(root, "Iota");
+  writeFileSync(join(paths.versionDir(1), "PRECIOUS"), "irreplaceable v1 history");
+
+  const ctxState = readState(paths.state);
+  if (!ctxState) throw new Error("expected context state");
+  ctxState.stages.synthesize = { status: "failed", attempts: 2, error: "engine exited 141" };
+  ctxState.targetVersion = undefined;
+  writeState(paths.state, ctxState);
+
+  const resumed = await smartBuild(makeCtx("Iota"), { refresh: false });
+
+  expect(resumed.ok).toBe(false);
+  expect(resumed.failedStage).toBe("generate");
+  expect(resumed.error).toMatch(/refusing to overwrite the already-built Site v1/);
+  // v1's files and the completion marker survive untouched.
+  expect(readFileSync(join(paths.versionDir(1), "PRECIOUS"), "utf8")).toBe(
+    "irreplaceable v1 history",
+  );
+  expect(existsSync(join(paths.versionDir(1), ".generated"))).toBe(true);
+});
+
+test("a missing Client record with existing Site Versions is refused, not overwritten", async () => {
+  await smartBuild(makeCtx("Lambda"), { refresh: false });
+  const paths = clientPaths(root, "Lambda");
+  writeFileSync(join(paths.versionDir(1), "PRECIOUS"), "irreplaceable v1 history");
+
+  // The Client record goes missing while v1 stays on disk (moved/deleted/corrupt).
+  rmSync(paths.clientJson, { force: true });
+
+  let caught: unknown;
+  await smartBuild(makeCtx("Lambda"), { refresh: false }).catch((err) => {
+    caught = err;
+  });
+  expect((caught as Error)?.message).toMatch(/no Client record .* but Site v1 exists/);
+  expect(readFileSync(join(paths.versionDir(1), "PRECIOUS"), "utf8")).toBe(
+    "irreplaceable v1 history",
+  );
 });
 
 test("variant generates a new Site Version from existing context", async () => {

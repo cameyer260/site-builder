@@ -86,8 +86,8 @@ prepended to the prompt for codey and opencode), effort flag (claudey/codey
 `result` event + rate-limit watchdog;
 codey/opencode `--json`/`--format json` terminal event + non-zero exit). `runEngine`
 keeps all process lifecycle (spawn, process-group kill, timeout, drain) generic and
-never rejects. Models are a two-tier abstraction — `best` (generate/audit) and
-`small` (synthesize/asset classification) — with a fixed stage→tier table in code and
+never rejects. Models are a two-tier abstraction — `best` (generate/audit/synthesize) and
+`small` (asset classification / Design Brief derivation) — with a fixed stage→tier table in code and
 each Engine's concrete ids in `config.engines.<kind>.models`. The per-run selection
 lives on `RunContext` (config holds only `defaultEngine` + per-engine reference data)
 and is **not** persisted across resume. Containment is delegated to each wrapper, so

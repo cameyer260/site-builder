@@ -35,7 +35,7 @@ import { AUDIT_SYSTEM_PROMPT, buildAuditPrompt } from "./prompts.ts";
  */
 
 const AUDIT_BUDGET_USD = 6;
-const AUDIT_TIMEOUT_MS = 1_200_000;
+const AUDIT_TIMEOUT_MS = 1_200_000; // 20 minutes
 /** Pages to inspect from the homepage; bounded to keep the review's cost in check. */
 const AUDIT_PAGE_CAP = 5;
 

@@ -70,18 +70,19 @@ test("engine flag beats config defaultEngine", () => {
   expect(ctx.engineKind).toBe("opencode");
 });
 
-test("modelFor maps generate/audit → best tier", () => {
+test("modelFor maps generate/audit/synthesize → best tier", () => {
   const ctx = buildRunContext({ config: makeConfig(), name: "Acme", version: 1, command: "build" });
   const best = DEFAULTS.engines.claudey.models.best;
   expect(ctx.modelFor("generate")).toBe(best);
   expect(ctx.modelFor("audit")).toBe(best);
+  expect(ctx.modelFor("synthesize")).toBe(best);
 });
 
-test("modelFor maps synthesize/assetClassification → small tier", () => {
+test("modelFor maps assetClassification/brief → small tier", () => {
   const ctx = buildRunContext({ config: makeConfig(), name: "Acme", version: 1, command: "build" });
   const small = DEFAULTS.engines.claudey.models.small;
-  expect(ctx.modelFor("synthesize")).toBe(small);
   expect(ctx.modelFor("assetClassification")).toBe(small);
+  expect(ctx.modelFor("brief")).toBe(small);
 });
 
 test("modelFor falls back to best tier for unknown stage names", () => {
@@ -91,9 +92,10 @@ test("modelFor falls back to best tier for unknown stage names", () => {
   expect(ctx.modelFor("")).toBe(best);
 });
 
-test("STAGE_TIER maps the four known stages to the right tiers", () => {
+test("STAGE_TIER maps the known stages to the right tiers", () => {
   expect(STAGE_TIER.generate).toBe("best");
   expect(STAGE_TIER.audit).toBe("best");
-  expect(STAGE_TIER.synthesize).toBe("small");
+  expect(STAGE_TIER.synthesize).toBe("best");
   expect(STAGE_TIER.assetClassification).toBe("small");
+  expect(STAGE_TIER.brief).toBe("small");
 });

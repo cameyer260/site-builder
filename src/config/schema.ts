@@ -17,7 +17,7 @@ export const ViewportsSchema = z.object({
 });
 export type Viewports = z.infer<typeof ViewportsSchema>;
 
-/** Per-engine model pair: best tier (generate/audit) and small tier (synthesize/classification). */
+/** Per-engine model pair: best tier (generate/audit/synthesize) and small tier (asset classification / Design Brief). */
 export const EngineProfileSchema = z.object({
   bin: z.string().min(1),
   models: z.object({
@@ -45,7 +45,7 @@ export const ConfigSchema = z.object({
       opencode: {
         bin: "opencode",
         models: {
-          best: "openrouter/moonshotai/kimi-k2.7-code",
+          best: "openrouter/deepseek/deepseek-v4-pro",
           small: "openrouter/deepseek/deepseek-v4-flash",
         },
       },
@@ -74,7 +74,7 @@ export const DEFAULTS: Omit<Config, "root" | "pexelsApiKey"> = {
     opencode: {
       bin: "opencode",
       models: {
-        best: "openrouter/moonshotai/kimi-k2.7-code",
+        best: "openrouter/deepseek/deepseek-v4-pro",
         small: "openrouter/deepseek/deepseek-v4-flash",
       },
     },

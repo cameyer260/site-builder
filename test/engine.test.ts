@@ -352,9 +352,9 @@ test("opencode buildInvocation: prompt is positional, no stdin", () => {
 });
 
 test("opencode buildInvocation: model passed as -m flag", () => {
-  const args = opencodeArgs({ model: "openrouter/moonshotai/kimi-k2.7-code" });
+  const args = opencodeArgs({ model: "openrouter/deepseek/deepseek-v4-pro" });
   expect(args).toContain("-m");
-  expect(args[args.indexOf("-m") + 1]).toBe("openrouter/moonshotai/kimi-k2.7-code");
+  expect(args[args.indexOf("-m") + 1]).toBe("openrouter/deepseek/deepseek-v4-pro");
 });
 
 test("opencode buildInvocation: appendSystemPrompt is prepended as XML block", () => {

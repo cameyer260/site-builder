@@ -69,7 +69,6 @@ export function buildAuditPrompt(input: AuditPromptInput): string {
     "- Preserve the Kit floor: one <header>/<main>/<footer>, the skip link, the",
     "  title/description/canonical/OG/JSON-LD meta, visible focus states, and the",
     "  reduced-motion rules.",
-    "- Do not invent specific awards, certifications, or statistics as verified fact.",
     "- Communicate only by writing audit/audit.md and editing files; print nothing.",
   ].join("\n");
 }

@@ -172,7 +172,7 @@ its recorded Inputs):
 
 - `--vibe <text>` — steer the Design Brief's **mood/feeling** (e.g. `--vibe "calm, trustworthy"`).
 - `--style <text>` — steer the Design Brief's **visual aesthetic** (e.g. `--style "high-contrast, condensed type"`).
-- `--yes` / `-y` — skip the interactive QA session (Unknowns become Guessed).
+- `--yes` / `-y` — skip the interactive QA session (Unknowns become Guessed; existing Guessed fields remain).
 
 > These three flags only feed the `generate` stage. On a **continue** whose first
 > unfinished stage is already past `generate` (`audit` or `deploy`), they have no
@@ -337,14 +337,14 @@ it.
 | `root` | *(required, prompted)* | Where Client folders live. |
 | `defaultEngine` | `claudey` | Engine used when `--engine` is not passed. |
 | `engines.claudey.bin` | `claudey` | Binary for the claudey engine. |
-| `engines.claudey.models.best` | `claude-opus-4-8` | generate + audit (best tier). |
-| `engines.claudey.models.small` | `claude-sonnet-4-6` | synthesize + assetClassification (small tier). |
+| `engines.claudey.models.best` | `claude-opus-4-8` | generate + audit + synthesize (best tier). |
+| `engines.claudey.models.small` | `claude-sonnet-4-6` | assetClassification + Design Brief (small tier). |
 | `engines.codey.bin` | `codey` | Binary for the codey engine. |
-| `engines.codey.models.best` | `gpt-5.5` | generate + audit. |
-| `engines.codey.models.small` | `gpt-5.4-mini` | synthesize + assetClassification. |
+| `engines.codey.models.best` | `gpt-5.5` | generate + audit + synthesize. |
+| `engines.codey.models.small` | `gpt-5.4-mini` | assetClassification + Design Brief. |
 | `engines.opencode.bin` | `opencode` | Binary for the opencode engine. |
-| `engines.opencode.models.best` | `openrouter/moonshotai/kimi-k2.7-code` | generate + audit. |
-| `engines.opencode.models.small` | `openrouter/deepseek/deepseek-v4-flash` | synthesize + assetClassification. |
+| `engines.opencode.models.best` | `openrouter/deepseek/deepseek-v4-pro` | generate + audit + synthesize. |
+| `engines.opencode.models.small` | `openrouter/deepseek/deepseek-v4-flash` | assetClassification + Design Brief. |
 | `wranglerBin` | `wrangler` | Cloudflare deploy. |
 | `ghBin` | `gh` | Only for `--github` / `sb push`. |
 | `pexelsApiKey` | *(unset)* | Enables tier-2 stock imagery. |

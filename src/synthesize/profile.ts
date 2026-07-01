@@ -50,6 +50,8 @@ export const ProfileFieldSchema = z.object({
   /** The answer; null when Unknown. A scalar or a list for multi-valued fields. */
   value: FieldValueSchema,
   status: FieldStatusSchema,
+  /** Source URL or Markdown file path that supports a Known value. */
+  source: z.string().optional(),
   /** Optional rationale, chiefly for Guessed values flagged for later review. */
   note: z.string().optional(),
 });

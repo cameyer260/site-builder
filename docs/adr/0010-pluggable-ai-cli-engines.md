@@ -16,7 +16,7 @@ The `EngineRunner` seam signature is preserved byte-for-byte (`(engineBin, opts)
 
 ## Configuration
 
-`config.json` is a registry of stable **reference data** (`defaultEngine` + `engines.<kind>.{bin, models: { best, small }}`, seeded from code `DEFAULTS`), not per-run state. The per-run **selection** (`--engine`, falling back to `defaultEngine`) lives on `RunContext`, so concurrent runs on different Engines never collide. Models are a two-tier abstraction (`best`/`small`) with a fixed stage→tier table in code (generate/audit→best, synthesize/assetClassification→small); each Engine fills both tiers with its own model ids and always runs at its maximum effort.
+`config.json` is a registry of stable **reference data** (`defaultEngine` + `engines.<kind>.{bin, models: { best, small }}`, seeded from code `DEFAULTS`), not per-run state. The per-run **selection** (`--engine`, falling back to `defaultEngine`) lives on `RunContext`, so concurrent runs on different Engines never collide. Models are a two-tier abstraction (`best`/`small`) with a fixed stage→tier table in code (`generate`/`audit`/`synthesize`→best, `assetClassification`/`brief`→small); each Engine fills both tiers with its own model ids and always runs at its maximum effort.
 
 ## Considered options
 

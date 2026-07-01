@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { relative } from "node:path";
-import { type ClientPaths, latestVersion, nextVersion } from "../storage/layout.ts";
+import { type ClientPaths, isVersionBuilt, latestVersion, nextVersion } from "../storage/layout.ts";
 import {
   ensureState,
   markCompleted,
@@ -89,6 +89,21 @@ async function runFrom(ctx: RunContext, startStage: string): Promise<RunResult> 
 
   const ran: string[] = [];
   for (const stage of STAGES.slice(start)) {
+    // Safety net for the one irreversible stage: `generate` rebuilds the Site
+    // Version tree from scratch (clearVersionTree), so it must never run against
+    // a version that already built to completion. Reaching here means upstream
+    // Site Version targeting resolved to a finished version — refuse *before*
+    // touching any stage state, leaving its files and git history intact. This
+    // is the production-path counterpart to the assertion in `runGenerate`.
+    if (stage.name === "generate" && isBuiltVersion(ctx)) {
+      const message =
+        `generate: refusing to overwrite the already-built Site v${ctx.version} — ` +
+        "regenerating would destroy its files and git history. This is a Site Version " +
+        "targeting bug; run `sb variant` for a new take.";
+      ctx.log.error(message);
+      return { ok: false, failedStage: "generate", error: message, ran };
+    }
+
     const handle = handleFor(stage.phase);
     ctx.log.step(`▶ ${stage.name} [${stage.phase}]`);
     markRunning(handle.state, stage.name);
@@ -115,6 +130,16 @@ async function runFrom(ctx: RunContext, startStage: string): Promise<RunResult> 
   }
 
   return { ok: true, ran };
+}
+
+/**
+ * Whether the Site Version `ctx.version` already built to completion. A
+ * brand-new version and a resumed generation that never finished both lack the
+ * completion marker, so its presence means a finished Site Version we must not
+ * regenerate over.
+ */
+function isBuiltVersion(ctx: RunContext): boolean {
+  return isVersionBuilt(ctx.paths, ctx.version);
 }
 
 /** Full pipeline run for a new Client (`sb build`). */
@@ -179,6 +204,18 @@ export async function smartBuild(
   opts: { refresh: boolean; flags?: GenerateFlags },
 ): Promise<BuildOutcome> {
   if (!existsSync(ctx.paths.clientJson)) {
+    // A missing Client record normally means a brand-new Client → build into v1.
+    // But if Site Versions already exist on disk, the record is missing
+    // unexpectedly (moved, hand-deleted, corrupted), and a fresh build would
+    // regenerate over v1 and destroy it. Refuse instead of silently clobbering.
+    const existing = latestVersion(ctx.paths.sites);
+    if (existing !== null) {
+      throw new UserError(
+        `build: no Client record for "${ctx.paths.name}", but Site v${existing} exists on disk`,
+        "refusing to regenerate over existing Site Versions — restore client.json " +
+          "(or move the sites/ directory aside) before rebuilding",
+      );
+    }
     ctx.version = 1;
     return { ...(await runBuild(ctx)), kind: "new", version: 1 };
   }

@@ -6,6 +6,7 @@ import { readClient } from "../storage/client.ts";
 import { clientExists, clientPaths, latestVersion } from "../storage/layout.ts";
 import { readState, type StageStatus, type State } from "../storage/state.ts";
 import { UserError } from "../util/errors.ts";
+import { formatUserDateTime } from "../util/time.ts";
 
 const USAGE = "usage: sb status <client>";
 
@@ -26,7 +27,8 @@ function printPhase(title: string, stageNames: string[], state: State | null): v
   }
   if (state?.lastRun) {
     const { status, stage, at } = state.lastRun;
-    console.log(pc.dim(`  last run: ${status}${stage ? ` @ ${stage}` : ""} (${at})`));
+    const when = formatUserDateTime(at);
+    console.log(pc.dim(`  last run: ${status}${stage ? ` @ ${stage}` : ""} (${when})`));
   } else {
     console.log(pc.dim("  last run: —"));
   }

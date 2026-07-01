@@ -7,7 +7,7 @@ import { type EngineRunner, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
 import { STAGE_TIER } from "../engine/tiers.ts";
 import type { Client } from "../storage/client.ts";
-import type { ClientPaths } from "../storage/layout.ts";
+import { type ClientPaths, isVersionBuilt, versionMarkerPath } from "../storage/layout.ts";
 import type { Profile } from "../synthesize/profile.ts";
 import { UserError } from "../util/errors.ts";
 import { commitAll } from "../util/git.ts";
@@ -22,7 +22,7 @@ import { type QaAsk, runQaSession } from "./qa.ts";
 /**
  * The real `generate` stage: turns the synthesized Context
  * into a tailored, locally-building Astro Site Version. In order: the QA session
- * resolves the Profile's Unknowns; the Kit is copied in and git-seeded; a small
+ * resolves the Profile's Unknown and Guessed fields; the Kit is copied in and git-seeded; a small
  * engine call derives the Design Brief; the main engine call builds the Site on
  * the Kit (honoring Brief + Profile, invoking `ui-ux-pro-max`); declared stock
  * image slots are fetched (Pexels → fallback pack); and `astro build` gates the
@@ -44,7 +44,7 @@ export interface GenerateParams {
   client: Client;
   /** The synthesized Profile (read from `context/profile.json`); QA mutates it. */
   profile: Profile;
-  /** Whether the QA gate may prompt. False → all Unknowns become Guessed. */
+  /** Whether the QA gate may prompt. False → all Unknowns become Guessed (Guessed fields remain). */
   interactive: boolean;
   vibe?: string;
   style?: string;
@@ -81,10 +81,16 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
 
   const versionDir = params.paths.versionDir(version);
 
+  // Last-line-of-defense before the irreversible clear below: never regenerate
+  // over a Site Version that already built to completion. The orchestrator
+  // guards this on the production path too, but the destruction lives here, so
+  // the check lives here as well — no caller may delete a finished version.
+  assertNotOverwritingBuiltVersion(paths, version);
+
   // 0. Rebuild from a pristine tree each run/resume (keep state.json).
   clearVersionTree(versionDir);
 
-  // 1. QA session — resolve the Profile's Unknown fields (the interactive gate).
+  // 1. QA session — resolve the Profile's Unknown and Guessed fields (interactive gate).
   await runQaSession({ profile, contextDir: paths.context, interactive, log, ask: params.qaAsk });
 
   // 2. Copy the Kit and seed the Site Version's git history.
@@ -158,8 +164,30 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
   if (commitAll(versionDir, "feat: generated site")) {
     log.step("generate: committed generated Site");
   }
-  writeFileSync(join(versionDir, ".generated"), `${nowIso()}\n`);
+  writeFileSync(versionMarkerPath(paths, version), `${nowIso()}\n`);
   log.success(`generate: built Site v${version}`);
+}
+
+/**
+ * Refuses to proceed when `version` already holds a Site Version that built to
+ * completion — signalled by the completion marker ({@link isVersionBuilt}),
+ * written only after a successful build + compile gate. `generate` rebuilds the
+ * tree from scratch ({@link clearVersionTree}), so overwriting a finished
+ * version would destroy its files and git history with no backup. No
+ * legitimate flow reaches here (a new version's dir is fresh; a resumed
+ * generation that never finished has no marker); reaching it means an
+ * upstream Site Version targeting bug.
+ */
+function assertNotOverwritingBuiltVersion(paths: ClientPaths, version: number): void {
+  if (!isVersionBuilt(paths, version)) {
+    return;
+  }
+  const versionDir = paths.versionDir(version);
+  throw new UserError(
+    `generate: refusing to overwrite the already-built Site v${version}`,
+    `${versionDir} was generated to completion; regenerating would destroy it and its git ` +
+      "history. This is a Site Version targeting bug. To make a new take, run `sb variant`.",
+  );
 }
 
 /**

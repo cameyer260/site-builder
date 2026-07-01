@@ -86,8 +86,8 @@ auth.
 - `runEngine` (`runner.ts`) spawns the wrapper, feeds the prompt on **stdin**
   (never as a positional), parses `stream-json`, and returns a success/failure
   verdict — it **never rejects**, so a stage decides what to do with a failure.
-- Model is chosen **per stage** from `config.models`: Opus for generate/audit,
-  Sonnet for synthesize/asset classification.
+- Model is chosen **per stage** from `config.models`: Opus for generate/audit/synthesize,
+  Sonnet for asset classification / Design Brief derivation.
 - Containment is delegated to `claudey` (a bypass-permissions container scoped to
   its mounts), so the tool sends **no permission flags** by default. The blast
   radius is the container mount scope.

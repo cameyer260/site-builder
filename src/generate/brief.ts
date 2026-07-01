@@ -76,8 +76,8 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
     }),
     cwd: versionDir,
     addDirs: [paths.context, paths.ingest],
-    // Brief uses the small tier (synthesize key) — not generate/best (ADR-0010).
-    model: modelFor("synthesize"),
+    // Brief uses the small tier (`brief` key) — a sub-call of generate, not a stage.
+    model: modelFor("brief"),
     maxBudgetUsd: BRIEF_BUDGET_USD,
     timeoutMs: BRIEF_TIMEOUT_MS,
     log,

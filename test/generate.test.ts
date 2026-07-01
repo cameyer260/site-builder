@@ -92,11 +92,13 @@ test("runQaSession (interactive) records answers as Known, skips as Guessed, sto
   writeFileSync(join(contextDir, "profile.md"), "# Profile\n");
   const profile = makeProfile();
 
-  // Answer the first Unknown, skip the second, cancel on the third.
+  // Answer the surfaced Guessed field, skip the first Unknown, cancel on the second.
   let seen = 0;
   const ask: QaAsk = async (field) => {
     seen += 1;
     if (seen === 1) {
+      // The Guessed field (tone) is surfaced first.
+      expect(field.prompt).toContain("Current guess");
       return { kind: "answer", value: `answer for ${field.key}` };
     }
     if (seen === 2) {
@@ -113,6 +115,7 @@ test("runQaSession (interactive) records answers as Known, skips as Guessed, sto
   const known = profile.fields.filter((f) => f.note === "provided in QA session");
   expect(known.length).toBe(1);
   expect(known[0]?.status).toBe("Known");
+  expect(known[0]?.key).toBe("tone");
 
   // the answer is appended to the human Profile so generate reads it
   expect(readFileSync(join(contextDir, "profile.md"), "utf8")).toContain("## QA session answers");
@@ -294,6 +297,40 @@ test("runGenerate fails when the build engine call fails", async () => {
     caught = err;
   }
   expect((caught as Error)?.message).toMatch(/Site build failed/);
+});
+
+test("runGenerate refuses to overwrite an already-built Site Version, leaving it intact", async () => {
+  const { paths, profile } = await setupClientContext();
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  // A finished v1: irreplaceable files + git history + the completion marker.
+  const versionDir = paths.versionDir(1);
+  mkdirSync(join(versionDir, ".git"), { recursive: true });
+  writeFileSync(join(versionDir, ".git", "HEAD"), "ref: refs/heads/main\n");
+  writeFileSync(join(versionDir, "src.astro"), "<html>the original v1</html>");
+  writeFileSync(join(versionDir, ".generated"), "2026-06-17T00:00:00.000Z\n");
+
+  let caught: unknown;
+  await runGenerate({
+    paths,
+    config,
+    version: 1,
+    client,
+    profile,
+    interactive: false,
+    log,
+    engine: fakeGenerateEngine(),
+    buildSite: fakeBuildOk,
+  }).catch((err) => {
+    caught = err;
+  });
+
+  expect((caught as Error)?.message).toMatch(/refusing to overwrite the already-built Site v1/);
+  // The finished version's tree and git history are untouched.
+  expect(existsSync(join(versionDir, ".git", "HEAD"))).toBe(true);
+  expect(readFileSync(join(versionDir, "src.astro"), "utf8")).toContain("the original v1");
+  // It was never re-copied from the Kit.
+  expect(existsSync(join(versionDir, "package.json"))).toBe(false);
 });
 
 // ---- shared astro runner --------------------------------------------------

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { runGenerate } from "../../generate/generate.ts";
 import { readClient } from "../../storage/client.ts";
+import { versionMarkerPath } from "../../storage/layout.ts";
 import { readProfile } from "../../synthesize/profile.ts";
 import type { Stage } from "../types.ts";
 
@@ -14,7 +15,7 @@ import type { Stage } from "../types.ts";
 export const generateStage: Stage = {
   name: "generate",
   phase: "generation",
-  outputs: (ctx) => [join(ctx.paths.versionDir(ctx.version), ".generated")],
+  outputs: (ctx) => [versionMarkerPath(ctx.paths, ctx.version)],
   async run(ctx) {
     const client = readClient(ctx.paths.clientJson);
     if (!client) {
