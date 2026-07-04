@@ -19,7 +19,11 @@ import {
   ProfileSchema,
   statusCounts,
 } from "../src/synthesize/profile.ts";
-import { renderChecklistGaps, runSynthesize } from "../src/synthesize/synthesize.ts";
+import {
+  renderAssetsSection,
+  renderChecklistGaps,
+  runSynthesize,
+} from "../src/synthesize/synthesize.ts";
 import { createLogger } from "../src/util/log.ts";
 import { fakeStageEngine } from "./fixtures/fake-stage-engine.ts";
 
@@ -115,6 +119,18 @@ test("the Profile schema normalizes multi-valued model output to string | string
   expect(displayFieldValue(["drains", "heaters"])).toBe("drains, heaters");
   expect(displayFieldValue("Acme")).toBe("Acme");
   expect(displayFieldValue(null)).toBe("");
+});
+
+test("renderAssetsSection lists each Asset, flagging fallbacks", () => {
+  const section = renderAssetsSection([
+    { role: "logo", file: "assets/logo.svg", source: "fallback", alt: "Acme logo" },
+    { role: "hero", file: "assets/hero.png", source: "captured", alt: "Storefront" },
+  ]);
+  expect(section).toContain("## Assets");
+  expect(section).toContain(
+    "**logo** (fallback — no original found): `assets/logo.svg` — Acme logo",
+  );
+  expect(section).toContain("**hero**: `assets/hero.png` — Storefront");
 });
 
 test("renderChecklistGaps reports a clean bill when all Known", () => {
@@ -304,6 +320,13 @@ test("runSynthesize classifies captured assets into the manifest (vision call)",
   expect(logo?.file).toBe("assets/logo.png");
   expect(logo?.originalUrl).toBe("http://x/logo.png");
   expect(existsSync(join(paths.context, "assets", "logo.png"))).toBe(true);
+
+  // profile.md (written before the asset manifest exists) gets the Assets
+  // section appended, so `generate`'s primary human-readable doc actually
+  // surfaces what it should reuse instead of only raw JSON.
+  const profileMd = readFileSync(join(paths.context, "profile.md"), "utf8");
+  expect(profileMd).toContain("## Assets");
+  expect(profileMd).toContain("**logo**: `assets/logo.png` — Acme logo");
 });
 
 async function expectSynthesizeError(

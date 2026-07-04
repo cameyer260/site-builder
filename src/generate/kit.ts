@@ -15,9 +15,13 @@ import type { Logger } from "../util/log.ts";
 /** Build artifacts and local state never copied from the Kit into a Site. */
 const SKIP_ENTRIES = new Set(["node_modules", ".astro", "dist", ".git", ".DS_Store", "state.json"]);
 
+// state.json is machine-managed pipeline bookkeeping (completed stages, run
+// status, timestamps) with no lasting value once generation finishes — kept
+// out of the Site Version's git history rather than committed as noise.
 const SITE_GITIGNORE = `node_modules/
 dist/
 .astro/
+/state.json
 `;
 
 /** Absolute path to the bundled Kit at the tool root (`<root>/kit`). */

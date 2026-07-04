@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildSite, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
@@ -13,6 +13,7 @@ import { UserError } from "../util/errors.ts";
 import { commitAll } from "../util/git.ts";
 import type { Logger } from "../util/log.ts";
 import { nowIso } from "../util/time.ts";
+import { artifactsDir, ensureArtifactsDir } from "./artifacts.ts";
 import { deriveBrief } from "./brief.ts";
 import { copyKitInto, gitInitBaseline } from "./kit.ts";
 import { readImagesManifest, resolveImages } from "./pexels.ts";
@@ -35,7 +36,6 @@ import { type QaAsk, runQaSession } from "./qa.ts";
 
 const GENERATE_BUDGET_USD = 10;
 const GENERATE_TIMEOUT_MS = 1_800_000;
-const IMAGES_JSON_REL = join("generate", "images.json");
 
 export interface GenerateParams {
   paths: ClientPaths;
@@ -93,9 +93,11 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
   // 1. QA session — resolve the Profile's Unknown and Guessed fields (interactive gate).
   await runQaSession({ profile, contextDir: paths.context, interactive, log, ask: params.qaAsk });
 
-  // 2. Copy the Kit and seed the Site Version's git history.
+  // 2. Copy the Kit, seed the Site Version's git history, and set up the
+  // pipeline-artifacts folder the Brief + build calls write into.
   copyKitInto(versionDir, log);
   gitInitBaseline(versionDir, log);
+  ensureArtifactsDir(versionDir);
 
   // 3. Derive the Design Brief (small engine call + brand-color extraction).
   await deriveBrief({
@@ -114,7 +116,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
   });
 
   // 4. The main AI build on top of the Kit.
-  const imagesJsonPath = join(versionDir, IMAGES_JSON_REL);
+  const imagesJsonPath = join(artifactsDir(versionDir), "images.json");
   log.step("generate: building Site (this can take several minutes)");
   const build = await engine(engineBin, {
     ...stageEngineDefaults(),
@@ -124,6 +126,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
       profileMdPath: join(paths.context, "profile.md"),
       profileJsonPath: join(paths.context, "profile.json"),
       assetsDir: join(paths.context, "assets"),
+      assets: profile.assets,
       imagesJsonPath,
     }),
     cwd: versionDir,
@@ -160,7 +163,13 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
     );
   }
 
-  // 7. Snapshot the generated Site (best-effort), then drop the completion marker.
+  // 7. Best-effort evidence check: warn (never fail) when a captured Asset never
+  // shows up anywhere in the built Site, so a silently-dropped logo/photo is at
+  // least visible to the operator instead of vanishing unnoticed (ADR-0007:
+  // evidence, not a gate — a real design reason to skip one is legitimate).
+  warnUnusedCapturedAssets(paths.context, versionDir, profile.assets, log);
+
+  // 8. Snapshot the generated Site (best-effort), then drop the completion marker.
   if (commitAll(versionDir, "feat: generated site")) {
     log.step("generate: committed generated Site");
   }
@@ -204,5 +213,60 @@ function clearVersionTree(versionDir: string): void {
       continue;
     }
     rmSync(join(versionDir, entry), { recursive: true, force: true });
+  }
+}
+
+/**
+ * Best-effort evidence check, not a gate: warns when a captured Asset's bytes
+ * never turn up anywhere under the built Site's `src/`/`public/` (scoped to
+ * those two — `node_modules`/`dist`/`.astro` are huge and irrelevant, and
+ * exist by this point since the compile gate already ran). Compares file
+ * *content*, not just filename — the Kit ships its own placeholders under the
+ * very names (`logo.png`, `hero.png`, …) the canonical Asset set reuses, so a
+ * name-only match can't tell "the model kept the Kit's default" from
+ * "the model copied in the real one". A prompt-only instruction to reuse
+ * captured Assets was previously easy for the build call to silently drop
+ * (e.g. drawing a substitute logo instead of using the real one) with nothing
+ * surfacing it; this makes that outcome visible without failing a Site that
+ * had a genuine reason to skip one.
+ */
+function warnUnusedCapturedAssets(
+  contextDir: string,
+  versionDir: string,
+  assets: Profile["assets"],
+  log: Logger,
+): void {
+  const captured = assets.filter((a) => a.source === "captured");
+  if (captured.length === 0) {
+    return;
+  }
+
+  const builtFiles = ["src", "public"]
+    .map((dir) => join(versionDir, dir))
+    .filter((dir) => existsSync(dir))
+    .flatMap((dir) => (readdirSync(dir, { recursive: true }) as string[]).map((f) => join(dir, f)));
+
+  const isPresent = (assetPath: string): boolean => {
+    let expected: Buffer;
+    try {
+      expected = readFileSync(assetPath);
+    } catch {
+      return true; // can't read the source Asset; don't report a false positive
+    }
+    return builtFiles.some((f) => {
+      try {
+        return readFileSync(f).equals(expected);
+      } catch {
+        return false; // directories and unreadable entries just don't match
+      }
+    });
+  };
+
+  const unused = captured.filter((a) => !isPresent(join(contextDir, a.file)));
+  if (unused.length > 0) {
+    const list = unused.map((a) => `${a.role} (${a.file})`).join(", ");
+    log.warn(
+      `generate: captured asset(s) not found anywhere in the built Site — verify they were used: ${list}`,
+    );
   }
 }

@@ -65,7 +65,11 @@ The hand-maintained, opinionated Astro + Tailwind starter copied into each new S
 _Avoid_: template, boilerplate, theme
 
 **Design Brief**:
-A short, explicit statement of one Site Version's visual direction — palette, type pairing, style/mood, layout character, imagery style — stored at `sites/vN/brief.md`. Derived at the start of `generate` from the Client's industry, brand cues, and existing-site screenshots/logo (honoring extracted brand colors when present), and editable or steerable via `--vibe`/`--style`. It is the deliberate lever for per-Client distinctiveness. A new variant is the same Client context with a different Design Brief.
+A short, explicit statement of one Site Version's visual direction — palette, type pairing, style/mood, layout character, imagery style — stored at `sites/vN/.site-builder/brief.md`. Derived at the start of `generate` from the Client's industry, brand cues, and existing-site screenshots/logo (honoring extracted brand colors when present), and editable or steerable via `--vibe`/`--style`. It is the deliberate lever for per-Client distinctiveness. A new variant is the same Client context with a different Design Brief.
+
+**`.site-builder/`**:
+The one folder inside a Site Version holding pipeline-internal artifacts that aren't Site content — the Design Brief (`brief.md`/`brief.json`), the declared stock-photo slots (`images.json`), and the completion marker (`.generated`). Dot-prefixed (like `.github/`) so it reads as tool metadata rather than a mystery folder once the prototype evolves into the Client's production repo. Committed to the Site Version's git history like everything else — unlike `state.json`, which is gitignored as pure machine bookkeeping with no lasting value.
+_Avoid_: generate/ (the old, confusingly app-code-like location)
 _Avoid_: theme, style guide, moodboard
 
 **`audit`**:

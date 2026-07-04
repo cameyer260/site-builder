@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { EngineResult, EngineRunner } from "../../src/engine/runner.ts";
+import { ARTIFACTS_DIRNAME } from "../../src/generate/artifacts.ts";
 
 /**
  * In-process fake of `runEngine` for the `generate` stage. It dispatches on the
@@ -9,6 +10,9 @@ import type { EngineResult, EngineRunner } from "../../src/engine/runner.ts";
  * `site.ts`, and a declared stock-image slot), so `runGenerate` can be exercised
  * offline and deterministically.
  */
+
+/** Stand-in bytes for a captured Asset, shared with tests seeding the source file at the same content. */
+export const FAKE_ASSET_BYTES = "captured-asset-bytes";
 
 const ok = (): EngineResult => ({
   ok: true,
@@ -34,10 +38,12 @@ export interface FakeGenerateEngineOptions {
   skipBriefMd?: boolean;
   /** Make the Site build call report failure. */
   failBuild?: boolean;
-  /** Don't write generate/images.json (no stock slots declared). */
+  /** Don't write .site-builder/images.json (no stock slots declared). */
   skipImagesJson?: boolean;
   /** Override the images.json payload (default: one landscape hero slot). */
   imagesJson?: unknown;
+  /** Relative path (within the Site dir) to drop a dummy file at, simulating the model copying in a captured Asset. */
+  copyAssetTo?: string;
 }
 
 export function fakeGenerateEngine(options: FakeGenerateEngineOptions = {}): EngineRunner {
@@ -49,9 +55,14 @@ export function fakeGenerateEngine(options: FakeGenerateEngineOptions = {}): Eng
         return fail();
       }
       if (!options.skipBriefMd) {
-        writeFileSync(join(dir, "brief.md"), "# Design Brief\n\nWarm, modern, trustworthy.\n");
+        const artifactsDir = join(dir, ARTIFACTS_DIRNAME);
+        mkdirSync(artifactsDir, { recursive: true });
         writeFileSync(
-          join(dir, "brief.json"),
+          join(artifactsDir, "brief.md"),
+          "# Design Brief\n\nWarm, modern, trustworthy.\n",
+        );
+        writeFileSync(
+          join(artifactsDir, "brief.json"),
           JSON.stringify({
             palette: { brand: "#1d4ed8", accent: "#f59e0b", ink: "#0f172a", surface: "#ffffff" },
             fonts: { heading: "Sora", body: "Inter" },
@@ -74,10 +85,16 @@ export function fakeGenerateEngine(options: FakeGenerateEngineOptions = {}): Eng
         join(dir, "src", "data", "site.ts"),
         'export const site = { name: "Tailored Co." } as const;\n',
       );
+      if (options.copyAssetTo) {
+        const dest = join(dir, options.copyAssetTo);
+        mkdirSync(dirname(dest), { recursive: true });
+        writeFileSync(dest, FAKE_ASSET_BYTES);
+      }
       if (!options.skipImagesJson) {
-        mkdirSync(join(dir, "generate"), { recursive: true });
+        const artifactsDir = join(dir, ARTIFACTS_DIRNAME);
+        mkdirSync(artifactsDir, { recursive: true });
         writeFileSync(
-          join(dir, "generate", "images.json"),
+          join(artifactsDir, "images.json"),
           JSON.stringify(
             options.imagesJson ?? {
               slots: [

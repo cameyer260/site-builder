@@ -30,9 +30,11 @@ ignore — develop it standalone (`cd kit && npm install && npm run dev`).
 
 ## How `generate` uses it
 
-1. `generate` derives the **Design Brief** (`sites/vN/brief.md`) from the Client's
-   industry, brand cues, and existing-site screenshots/logo, steerable with
-   `--vibe`/`--style`.
+1. `generate` derives the **Design Brief** (`sites/vN/.site-builder/brief.md`)
+   from the Client's industry, brand cues, and existing-site screenshots/logo,
+   steerable with `--vibe`/`--style`. `.site-builder/` holds this and the
+   declared stock-photo manifest — pipeline-internal artifacts, not Site
+   content.
 2. It copies `kit/` into `sites/vN/` and `git init`s that directory — from here
    on, the Site Version is its own repo and the Kit copy is independent of the
    source Kit.

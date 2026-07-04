@@ -14,6 +14,12 @@ The split ensures the AI-edit command and manual edits can never corrupt resume 
 
 `sb resume` reads whichever level the failure occurred in.
 
+The version-level `state.json` sits inside the Site Version's own git repo
+(ADR-0005), but is gitignored there — it's mid-flight pipeline bookkeeping with
+no lasting value once generation finishes, not Site content worth a permanent
+commit trail. `.site-builder/`'s contents (Design Brief, image manifest,
+completion marker), by contrast, are informational and stay committed.
+
 Resulting layout:
 ```
 <root>/
@@ -24,6 +30,7 @@ Resulting layout:
     ├── context/             ← Client Profile (MD + JSON sidecar), Checklist gaps
     └── sites/
         └── v1/
-            ├── state.json   ← generation-phase state (machine)
-            └── ...          ← Astro project (own git repo), audit/
+            ├── state.json      ← generation-phase state (machine, gitignored)
+            ├── .site-builder/  ← pipeline artifacts (Brief, image manifest), not Site content
+            └── ...             ← Astro project (own git repo), audit/
 ```

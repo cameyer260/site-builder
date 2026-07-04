@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
 import type { EngineKind } from "../engine/adapter.ts";
@@ -147,6 +147,13 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
  * stamps in the authoritative client name + reconciled asset manifest, and
  * derives the Checklist gaps file deterministically so it always matches the
  * recorded Field statuses.
+ *
+ * The asset manifest doesn't exist until after Call B has already written
+ * `profile.md` (it's the result of Call A + deterministic reconciliation), so
+ * the model has no way to mention it there itself. We append it here so the
+ * one document `generate` is told holds "all the business facts" actually
+ * surfaces the Assets it should reuse, instead of leaving them discoverable
+ * only as JSON the model must think to go read.
  */
 function finalizeProfile(
   contextDir: string,
@@ -163,7 +170,30 @@ function finalizeProfile(
   profile.generatedAt = nowIso();
   profile.assets = assets;
   persistProfile(contextDir, profile);
+  if (assets.length > 0) {
+    appendFileSync(join(contextDir, "profile.md"), renderAssetsSection(assets));
+  }
   return profile;
+}
+
+/** The "## Assets" section appended to `profile.md` (CONTEXT.md "Asset"). */
+export function renderAssetsSection(assets: AssetManifestEntry[]): string {
+  const lines = [
+    "",
+    "## Assets",
+    "",
+    "Captured from the Client's own existing site/materials (or a Fallback Asset",
+    "where none was found) — `generate` should reuse these rather than",
+    "substituting stock photography or a redrawn mark:",
+    "",
+  ];
+  for (const a of assets) {
+    const tag = a.source === "fallback" ? " (fallback — no original found)" : "";
+    const alt = a.alt ? ` — ${a.alt}` : "";
+    lines.push(`- **${a.role}**${tag}: \`${a.file}\`${alt}`);
+  }
+  lines.push("");
+  return lines.join("\n");
 }
 
 /**

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EngineResult, EngineRunner } from "../../src/engine/runner.ts";
+import { ARTIFACTS_DIRNAME } from "../../src/generate/artifacts.ts";
 import { CHECKLIST } from "../../src/synthesize/checklist.ts";
 
 /**
@@ -61,16 +62,19 @@ export function fakeStageEngine(options: FakeStageEngineOptions = {}): EngineRun
   return async (_engineBin, opts) => {
     // generate's Design Brief call
     if (opts.prompt.includes("art director defining the Design Brief")) {
-      writeFileSync(join(opts.cwd, "brief.md"), "# Design Brief\n\nClean and modern.\n");
+      const artifactsDir = join(opts.cwd, ARTIFACTS_DIRNAME);
+      mkdirSync(artifactsDir, { recursive: true });
+      writeFileSync(join(artifactsDir, "brief.md"), "# Design Brief\n\nClean and modern.\n");
       return ok();
     }
     // generate's Site build call
     if (opts.prompt.includes("building a production-quality marketing website")) {
       mkdirSync(join(opts.cwd, "src", "data"), { recursive: true });
       writeFileSync(join(opts.cwd, "src", "data", "site.ts"), "export const site = {};\n");
-      mkdirSync(join(opts.cwd, "generate"), { recursive: true });
+      const artifactsDir = join(opts.cwd, ARTIFACTS_DIRNAME);
+      mkdirSync(artifactsDir, { recursive: true });
       writeFileSync(
-        join(opts.cwd, "generate", "images.json"),
+        join(artifactsDir, "images.json"),
         JSON.stringify({ slots: [{ id: "hero", query: "office", orientation: "landscape" }] }),
       );
       return ok();

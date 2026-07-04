@@ -8,15 +8,16 @@ import { STAGE_TIER } from "../engine/tiers.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import { displayFieldValue, type Profile } from "../synthesize/profile.ts";
 import type { Logger } from "../util/log.ts";
+import { artifactsDir } from "./artifacts.ts";
 import { buildBriefPrompt } from "./prompts.ts";
 
 /**
  * **Design Brief** derivation (CONTEXT.md): a small engine
  * call that turns the Client Profile, logo (brand colors), and existing-site
- * screenshots into `sites/vN/brief.md` — one Site Version's explicit visual
- * direction, steerable via `--vibe`/`--style`. Best-effort: if the call fails
- * or omits the file, a deterministic Brief derived from the Profile is written
- * instead, so the build always has a direction to honor.
+ * screenshots into `sites/vN/.site-builder/brief.md` — one Site Version's
+ * explicit visual direction, steerable via `--vibe`/`--style`. Best-effort: if
+ * the call fails or omits the file, a deterministic Brief derived from the
+ * Profile is written instead, so the build always has a direction to honor.
  */
 
 const BRIEF_BUDGET_USD = 1.5;
@@ -54,7 +55,7 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
     });
 
   const versionDir = paths.versionDir(version);
-  const briefMdPath = join(versionDir, "brief.md");
+  const briefMdPath = join(artifactsDir(versionDir), "brief.md");
 
   const logoEntry = profile.assets.find((a) => a.role === "logo");
   const logoPath = logoEntry ? join(paths.context, logoEntry.file) : undefined;
@@ -66,7 +67,7 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
     engine: engineKind,
     prompt: buildBriefPrompt({
       clientName,
-      versionDir,
+      artifactsDir: artifactsDir(versionDir),
       profileMdPath: join(paths.context, "profile.md"),
       profileJsonPath: join(paths.context, "profile.json"),
       logoPath: logoPath && existsSync(logoPath) ? logoPath : undefined,

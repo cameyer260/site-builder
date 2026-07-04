@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
 import type { EngineRunner } from "../src/engine/runner.ts";
 import { STAGE_TIER } from "../src/engine/tiers.ts";
+import { ARTIFACTS_DIRNAME } from "../src/generate/artifacts.ts";
 import { runVariant, smartBuild } from "../src/pipeline/orchestrator.ts";
 import type { RunContext } from "../src/pipeline/types.ts";
 import { type ClientInputs, ClientInputsSchema, readClient } from "../src/storage/client.ts";
@@ -168,7 +169,7 @@ test("a context resume that mis-resolves to a completed Site Version is refused,
   expect(readFileSync(join(paths.versionDir(1), "PRECIOUS"), "utf8")).toBe(
     "irreplaceable v1 history",
   );
-  expect(existsSync(join(paths.versionDir(1), ".generated"))).toBe(true);
+  expect(existsSync(join(paths.versionDir(1), ARTIFACTS_DIRNAME, ".generated"))).toBe(true);
 });
 
 test("a missing Client record with existing Site Versions is refused, not overwritten", async () => {

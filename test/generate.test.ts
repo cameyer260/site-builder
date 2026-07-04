@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hasLocalAstroBin, runCommand } from "../src/astro/run.ts";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
+import { ARTIFACTS_DIRNAME } from "../src/generate/artifacts.ts";
 import { runGenerate } from "../src/generate/generate.ts";
 import { readImagesManifest, resolveImages } from "../src/generate/pexels.ts";
 import { type QaAsk, runQaSession } from "../src/generate/qa.ts";
@@ -17,7 +18,7 @@ import {
   writeProfile,
 } from "../src/synthesize/profile.ts";
 import { createLogger } from "../src/util/log.ts";
-import { fakeGenerateEngine } from "./fixtures/fake-generate-engine.ts";
+import { FAKE_ASSET_BYTES, fakeGenerateEngine } from "./fixtures/fake-generate-engine.ts";
 
 const log = createLogger({ quiet: true });
 const config = { ...DEFAULTS, root: "/unused" } as Config;
@@ -213,11 +214,24 @@ test("runGenerate produces a tailored, building Site Version with brief + stock 
 
   // milestone: a real, locally-building Astro site materialized
   expect(existsSync(join(versionDir, "package.json"))).toBe(true); // Kit copied
-  expect(existsSync(join(versionDir, "brief.md"))).toBe(true); // Design Brief
+  expect(existsSync(join(versionDir, ARTIFACTS_DIRNAME, "brief.md"))).toBe(true); // Design Brief
   expect(readFileSync(join(versionDir, "src/data/site.ts"), "utf8")).toContain("Tailored Co.");
   expect(existsSync(join(versionDir, "src/assets/stock/hero.jpg"))).toBe(true); // fallback stock
-  expect(existsSync(join(versionDir, ".generated"))).toBe(true); // completion marker
+  expect(existsSync(join(versionDir, ARTIFACTS_DIRNAME, ".generated"))).toBe(true); // completion marker
   expect(compiled).toBe(1); // compile gate ran
+
+  // pipeline-internal artifacts (Brief, image manifest) are tucked into one
+  // clearly-labeled folder, not scattered at the project root
+  expect(existsSync(join(versionDir, ARTIFACTS_DIRNAME, "README.md"))).toBe(true);
+  expect(existsSync(join(versionDir, ARTIFACTS_DIRNAME, "images.json"))).toBe(true);
+  expect(existsSync(join(versionDir, "brief.md"))).toBe(false); // not loose at the root
+  expect(existsSync(join(versionDir, "generate", "images.json"))).toBe(false);
+
+  // state.json is machine bookkeeping, not Site content — gitignored, so it
+  // never ends up in the Site Version's committed history
+  expect(readFileSync(join(versionDir, ".gitignore"), "utf8")).toContain("state.json");
+  const tracked = await runCommand("git", ["ls-files"], { cwd: versionDir });
+  expect(tracked.output).not.toContain("state.json");
 
   // node_modules was never copied from the Kit
   expect(existsSync(join(versionDir, "node_modules"))).toBe(false);
@@ -230,6 +244,56 @@ test("runGenerate produces a tailored, building Site Version with brief + stock 
     JSON.parse(readFileSync(join(paths.context, "profile.json"), "utf8")),
   );
   expect(statusCounts(onDisk.fields).Unknown).toBe(0);
+});
+
+test("runGenerate warns (without failing) when a captured Asset never turns up in the built Site", async () => {
+  const { paths, profile } = await setupClientContext();
+  mkdirSync(join(paths.context, "assets"), { recursive: true });
+  writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
+  profile.assets = [
+    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+  ];
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  const warnings: string[] = [];
+  await runGenerate({
+    paths,
+    config,
+    version: 1,
+    client,
+    profile,
+    interactive: false,
+    log: { ...log, warn: (m) => warnings.push(m) },
+    engine: fakeGenerateEngine(), // never copies the captured logo into the Site
+    buildSite: fakeBuildOk,
+  });
+
+  expect(warnings.some((w) => w.includes("logo (assets/logo.png)"))).toBe(true);
+});
+
+test("runGenerate does not warn when the captured Asset was actually copied into the Site", async () => {
+  const { paths, profile } = await setupClientContext();
+  mkdirSync(join(paths.context, "assets"), { recursive: true });
+  writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
+  profile.assets = [
+    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+  ];
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  const warnings: string[] = [];
+  await runGenerate({
+    paths,
+    config,
+    version: 1,
+    client,
+    profile,
+    interactive: false,
+    log: { ...log, warn: (m) => warnings.push(m) },
+    engine: fakeGenerateEngine({ copyAssetTo: "src/assets/logo.png" }),
+    buildSite: fakeBuildOk,
+  });
+
+  expect(warnings.some((w) => w.includes("logo"))).toBe(false);
 });
 
 test("runGenerate falls back to a Profile-derived Brief when the call omits brief.md", async () => {
@@ -248,7 +312,7 @@ test("runGenerate falls back to a Profile-derived Brief when the call omits brie
     buildSite: fakeBuildOk,
   });
 
-  const brief = readFileSync(join(paths.versionDir(1), "brief.md"), "utf8");
+  const brief = readFileSync(join(paths.versionDir(1), ARTIFACTS_DIRNAME, "brief.md"), "utf8");
   expect(brief).toContain("Auto-derived");
   expect(brief).toContain("plumbing"); // industry pulled from the Profile
 });
@@ -308,7 +372,8 @@ test("runGenerate refuses to overwrite an already-built Site Version, leaving it
   mkdirSync(join(versionDir, ".git"), { recursive: true });
   writeFileSync(join(versionDir, ".git", "HEAD"), "ref: refs/heads/main\n");
   writeFileSync(join(versionDir, "src.astro"), "<html>the original v1</html>");
-  writeFileSync(join(versionDir, ".generated"), "2026-06-17T00:00:00.000Z\n");
+  mkdirSync(join(versionDir, ARTIFACTS_DIRNAME), { recursive: true });
+  writeFileSync(join(versionDir, ARTIFACTS_DIRNAME, ".generated"), "2026-06-17T00:00:00.000Z\n");
 
   let caught: unknown;
   await runGenerate({

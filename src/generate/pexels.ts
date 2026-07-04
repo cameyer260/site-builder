@@ -6,7 +6,7 @@ import type { Logger } from "../util/log.ts";
 
 /**
  * **Image sourcing** tiers 2 + 3 (CONTEXT.md): the AI build declares each photo
- * slot it needs (intent + search keywords) in `generate/images.json` and
+ * slot it needs (intent + search keywords) in `.site-builder/images.json` and
  * references the file at `src/assets/stock/<id>.jpg`; this module fetches the
  * top **Pexels** result per slot (tier 2, needs an API key) and falls back to
  * the curated Fallback Asset stock pack offline / when a fetch fails (tier 3),
@@ -32,7 +32,7 @@ export type ImagesManifest = z.infer<typeof ImagesManifestSchema>;
 const FALLBACK_STOCK_DIR = fileURLToPath(new URL("../../assets/fallbacks/stock", import.meta.url));
 const STOCK_SUBDIR = join("src", "assets", "stock");
 
-/** Reads + validates the AI-written `generate/images.json`, or null if absent/invalid. */
+/** Reads + validates the AI-written `.site-builder/images.json`, or null if absent/invalid. */
 export function readImagesManifest(path: string): ImagesManifest | null {
   if (!existsSync(path)) {
     return null;

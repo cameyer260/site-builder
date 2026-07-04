@@ -1,3 +1,5 @@
+import type { AssetManifestEntry } from "../synthesize/profile.ts";
+
 /**
  * Prompts for the two `generate` engine calls (the Design Brief and the Site
  * build). Per ADR-0006 the tool's own instructions stay thin — tool
@@ -20,7 +22,8 @@ export const GENERATE_SYSTEM_PROMPT = [
 
 export interface BriefPromptInput {
   clientName: string;
-  versionDir: string;
+  /** `.site-builder/` — where brief.md/brief.json are written (see `artifacts.ts`). */
+  artifactsDir: string;
   profileMdPath: string;
   profileJsonPath: string;
   logoPath?: string;
@@ -29,7 +32,7 @@ export interface BriefPromptInput {
   style?: string;
 }
 
-/** Engine call 1: derive the Design Brief → `brief.md` (+ `brief.json`). */
+/** Engine call 1: derive the Design Brief → `.site-builder/brief.md` (+ `brief.json`). */
 export function buildBriefPrompt(input: BriefPromptInput): string {
   const lines = [
     `You are an art director defining the Design Brief — the explicit visual`,
@@ -74,7 +77,7 @@ export function buildBriefPrompt(input: BriefPromptInput): string {
     '- Style & mood: a few words (e.g. "warm, trustworthy, local").',
     "- Layout character and imagery style.",
     "",
-    `Write exactly two files into ${input.versionDir}:`,
+    `Write exactly two files into ${input.artifactsDir}:`,
     "1. brief.md — the human-readable Design Brief (the primary artifact generate",
     "   reads): sections for palette (list the hex values), typography, style/mood,",
     "   layout, and imagery.",
@@ -91,7 +94,24 @@ export interface GeneratePromptInput {
   profileMdPath: string;
   profileJsonPath: string;
   assetsDir: string;
+  assets: AssetManifestEntry[];
   imagesJsonPath: string;
+}
+
+/**
+ * Renders one explicit line per Asset — spelling out role, file, and (for the
+ * logo) the requirement to use it — so `generate` is handed the facts
+ * directly instead of having to notice and cross-reference `profile.json`.
+ */
+function renderAssetLines(assets: AssetManifestEntry[]): string[] {
+  if (assets.length === 0) {
+    return ["   (none captured — rely on stock photography for step 4 below.)"];
+  }
+  return assets.map((a) => {
+    const alt = a.alt ? ` (alt: "${a.alt}")` : "";
+    const requirement = a.role === "logo" ? " — use this as the site's logo/brand mark" : "";
+    return `   - ${a.role} → ${a.file}${alt}${requirement}`;
+  });
 }
 
 /** Engine call 2: build the Site on top of the copied Kit. */
@@ -105,27 +125,34 @@ export function buildGeneratePrompt(input: GeneratePromptInput): string {
     "tailor. Follow it.",
     "",
     "Source of truth — read these:",
-    "- ./brief.md — the Design Brief: palette, fonts, style/mood. Honor it.",
-    `- ${input.profileMdPath} — the Client Profile (all the business facts).`,
-    `- ${input.profileJsonPath} — machine facts: \`fields\` (each with a status) and the`,
-    "  `assets` manifest (role + file + alt).",
+    "- ./.site-builder/brief.md — the Design Brief: palette, fonts, style/mood. Honor it.",
+    `- ${input.profileMdPath} — the Client Profile (all the business facts, incl. Assets).`,
+    `- ${input.profileJsonPath} — machine facts: \`fields\`, each with a status.`,
+    "",
+    "(`.site-builder/` holds pipeline-only artifacts — the Design Brief above, plus",
+    " the image-sourcing manifest you'll write in step 4 below. It is not site",
+    " content: never reference it from Astro code, and leave it in place.)",
     "",
     "Use the `ui-ux-pro-max` skill for design execution (layout, spacing, type",
     "scale, component patterns, accessibility).",
     "",
     "Build the Site:",
     "1. Theme to the Brief: override the `@theme` tokens in src/styles/global.css so",
-    "   the brand color ramp and fonts match brief.json. Do not edit theme.css. Load",
-    "   the Brief's Google Fonts in the layout <head>.",
+    "   the brand color ramp and fonts match .site-builder/brief.json. Do not edit",
+    "   theme.css. Load the Brief's Google Fonts in the layout <head>.",
     "2. Wire real content: replace src/data/site.ts and every placeholder string with",
     "   the Client's real facts. For fields flagged Guessed in profile.json (including",
     "   those with a null value), write plausible, on-brand copy so the Site is",
     '   complete — never leave "Service One", lorem ipsum, or fake-looking contact',
     "   details.",
-    `3. Assets: the Client's real images are under ${input.assetsDir} (see the \`assets\``,
-    "   manifest in profile.json). Copy the ones you use into src/assets/, wire them",
-    "   through astro:assets and src/assets/index.ts, and use the `logo` asset as the",
-    "   site logo.",
+    `3. Assets: these were captured from the Client's own existing site/materials`,
+    `   and already sit under ${input.assetsDir}. Copy each one you use into`,
+    "   src/assets/, wire it through astro:assets and src/assets/index.ts. Prefer",
+    "   them over stock photography or a hand-drawn/redrawn substitute — they are",
+    "   real and already the Client's own. Only skip one if it is genuinely",
+    "   unusable (corrupted, unreadable, wrong subject) — never merely because",
+    "   you would prefer a different look:",
+    ...renderAssetLines(input.assets),
     "4. Photography you still need: do NOT download images or hot-link remote URLs.",
     `   For each photo slot, add an entry to ${input.imagesJsonPath} as JSON:`,
     '   { "slots": [ { "id": "<lowercase-slug>", "query": "<search keywords>",',

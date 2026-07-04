@@ -110,6 +110,14 @@ export function isDir(dir: string): boolean {
 }
 
 /**
+ * `.site-builder/` — the one directory inside a Site Version holding
+ * pipeline-internal artifacts (Design Brief, image-sourcing manifest, the
+ * completion marker below) instead of scattering them at the project root
+ * (`src/generate/artifacts.ts` owns creating it and writing into it).
+ */
+export const ARTIFACTS_DIRNAME = ".site-builder";
+
+/**
  * Marker file `generate` writes into a Site Version's dir only after its
  * compile gate passes. Its presence means the version built to completion and
  * must never be regenerated over (ADR — Site Version overwrite protection).
@@ -118,7 +126,7 @@ export const GENERATED_MARKER = ".generated";
 
 /** Path to `version`'s completion marker under `paths`. */
 export function versionMarkerPath(paths: ClientPaths, version: number): string {
-  return join(paths.versionDir(version), GENERATED_MARKER);
+  return join(paths.versionDir(version), ARTIFACTS_DIRNAME, GENERATED_MARKER);
 }
 
 /** Whether Site Version `version` under `paths` already built to completion. */
