@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import type { EngineResult, EngineRunner } from "../../src/engine/runner.ts";
 import { ARTIFACTS_DIRNAME } from "../../src/generate/artifacts.ts";
 
@@ -42,8 +42,12 @@ export interface FakeGenerateEngineOptions {
   skipImagesJson?: boolean;
   /** Override the images.json payload (default: one landscape hero slot). */
   imagesJson?: unknown;
-  /** Relative path (within the Site dir) to drop a dummy file at, simulating the model copying in a captured Asset. */
-  copyAssetTo?: string;
+  /**
+   * The `assets/<file>` (`profile.json` shape) of an already-staged Asset to
+   * reference from `src/data/site.ts`, simulating the model wiring in a
+   * captured Asset `placeCapturedAssets` staged before this call ran.
+   */
+  referenceAsset?: string;
 }
 
 export function fakeGenerateEngine(options: FakeGenerateEngineOptions = {}): EngineRunner {
@@ -81,15 +85,13 @@ export function fakeGenerateEngine(options: FakeGenerateEngineOptions = {}): Eng
       }
       // Stand in for the model tailoring the Kit.
       mkdirSync(join(dir, "src", "data"), { recursive: true });
+      const assetImport = options.referenceAsset
+        ? `import "@/assets/captured/${basename(options.referenceAsset)}";\n`
+        : "";
       writeFileSync(
         join(dir, "src", "data", "site.ts"),
-        'export const site = { name: "Tailored Co." } as const;\n',
+        `${assetImport}export const site = { name: "Tailored Co." } as const;\n`,
       );
-      if (options.copyAssetTo) {
-        const dest = join(dir, options.copyAssetTo);
-        mkdirSync(dirname(dest), { recursive: true });
-        writeFileSync(dest, FAKE_ASSET_BYTES);
-      }
       if (!options.skipImagesJson) {
         const artifactsDir = join(dir, ARTIFACTS_DIRNAME);
         mkdirSync(artifactsDir, { recursive: true });

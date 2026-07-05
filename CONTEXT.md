@@ -119,5 +119,5 @@ A media file (chiefly an image) downloaded from the Client's existing site durin
 A tool-provided default (e.g. a generic logo) used in the generated Site when the corresponding required Asset was not found among the Client's downloaded Assets.
 
 **Image sourcing**:
-The three-tier rule for non-logo imagery during `generate`: (1) the Client's real captured Assets when good enough; (2) **Pexels** stock fetched at generate time — the Engine declares each slot's intent and search keywords, code does the fetch/download and hands files to Astro `<Image>`; (3) the curated Fallback Asset pack for offline / no-API-key. Tier 2 needs a Pexels API key (managed by `sb config`).
+The three-tier rule for non-logo imagery during `generate`: (1) the Client's real captured Assets when good enough — code stages these into the Site before the Engine runs, so the Engine only decides whether/where to reference one, never locates or copies it; (2) **Pexels** stock fetched at generate time — the Engine declares each slot's intent and search keywords, code does the fetch/download and hands files to Astro `<Image>`; (3) the curated Fallback Asset pack for offline / no-API-key. Tier 2 needs a Pexels API key (managed by `sb config`).
 _Avoid_: placeholder, media library

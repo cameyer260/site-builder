@@ -24,7 +24,9 @@ CLI — the **Engine** (`claudey` by default, or `codey`/`opencode` via `--engin
   CRM/GitHub continuation operations), 0009 (idiomatic functional TS over
   literal OO-SOLID — cleanups are DRY/consistency behind a frozen behavioral
   contract, not re-architecture), 0010 (pluggable Engines: `claudey`/`codey`/
-  `opencode` behind a per-CLI adapter, selected per run with `--engine`).
+  `opencode` behind a per-CLI adapter, selected per run with `--engine`), 0011
+  (captured Assets are staged into the Site Version by code before the build
+  call runs, not copied by the Engine).
 - **`docs/roadmap.md`** — what is *explicitly out of scope for v1*; don't build these
   without being asked.
 

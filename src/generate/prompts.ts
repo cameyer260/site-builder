@@ -1,4 +1,5 @@
 import type { AssetManifestEntry } from "../synthesize/profile.ts";
+import { capturedAssetPath } from "./assets.ts";
 
 /**
  * Prompts for the two `generate` engine calls (the Design Brief and the Site
@@ -93,24 +94,33 @@ export interface GeneratePromptInput {
   clientName: string;
   profileMdPath: string;
   profileJsonPath: string;
-  assetsDir: string;
   assets: AssetManifestEntry[];
   imagesJsonPath: string;
 }
 
 /**
- * Renders one explicit line per Asset — spelling out role, file, and (for the
- * logo) the requirement to use it — so `generate` is handed the facts
- * directly instead of having to notice and cross-reference `profile.json`.
+ * Renders one explicit line per Asset — spelling out role, its already-staged
+ * path, and (for the logo) the requirement to use it — so `generate` is
+ * handed the facts directly instead of having to notice and cross-reference
+ * `profile.json`. Points at `capturedAssetPath`, not `profile.json`'s own
+ * `file` (a `context/` path outside this project) — `placeCapturedAssets`
+ * copies each Asset to that location before this prompt ever runs, so the
+ * Engine only has to reference an existing file, never locate or copy one.
+ *
+ * Excludes `icon`: `placeFavicon` already swapped it into `public/` and
+ * repointed the Kit's `<link rel="icon">` in code, with no build-call
+ * involvement — listing it here would just invite the model to also try
+ * wiring it through `astro:assets`, which isn't how a favicon works.
  */
 function renderAssetLines(assets: AssetManifestEntry[]): string[] {
-  if (assets.length === 0) {
+  const relevant = assets.filter((a) => a.role !== "icon");
+  if (relevant.length === 0) {
     return ["   (none captured — rely on stock photography for step 4 below.)"];
   }
-  return assets.map((a) => {
+  return relevant.map((a) => {
     const alt = a.alt ? ` (alt: "${a.alt}")` : "";
     const requirement = a.role === "logo" ? " — use this as the site's logo/brand mark" : "";
-    return `   - ${a.role} → ${a.file}${alt}${requirement}`;
+    return `   - ${a.role} → ${capturedAssetPath(a.file)}${alt}${requirement}`;
   });
 }
 
@@ -145,13 +155,16 @@ export function buildGeneratePrompt(input: GeneratePromptInput): string {
     "   those with a null value), write plausible, on-brand copy so the Site is",
     '   complete — never leave "Service One", lorem ipsum, or fake-looking contact',
     "   details.",
-    `3. Assets: these were captured from the Client's own existing site/materials`,
-    `   and already sit under ${input.assetsDir}. Copy each one you use into`,
-    "   src/assets/, wire it through astro:assets and src/assets/index.ts. Prefer",
-    "   them over stock photography or a hand-drawn/redrawn substitute — they are",
-    "   real and already the Client's own. Only skip one if it is genuinely",
-    "   unusable (corrupted, unreadable, wrong subject) — never merely because",
-    "   you would prefer a different look:",
+    "3. Assets: these were captured from the Client's own existing site/materials",
+    "   and are already staged in this project — no need to copy or fetch",
+    "   anything. Reference the ones that fit through astro:assets and",
+    "   src/assets/index.ts (add an export alongside the Kit's defaults, the same",
+    "   way you wire stock photography below). Prefer them over stock photography",
+    "   or a hand-drawn/redrawn substitute — they are real and already the",
+    "   Client's own. Only skip one if it is genuinely unusable (corrupted,",
+    "   unreadable, wrong subject) — never merely because you would prefer a",
+    "   different look. (The favicon, if captured, is handled separately — already",
+    "   swapped in; nothing to do there.)",
     ...renderAssetLines(input.assets),
     "4. Photography you still need: do NOT download images or hot-link remote URLs.",
     `   For each photo slot, add an entry to ${input.imagesJsonPath} as JSON:`,

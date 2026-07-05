@@ -246,7 +246,41 @@ test("runGenerate produces a tailored, building Site Version with brief + stock 
   expect(statusCounts(onDisk.fields).Unknown).toBe(0);
 });
 
-test("runGenerate warns (without failing) when a captured Asset never turns up in the built Site", async () => {
+test("runGenerate stages every Profile Asset into src/assets/captured/ before the build call runs", async () => {
+  const { paths, profile } = await setupClientContext();
+  mkdirSync(join(paths.context, "assets"), { recursive: true });
+  writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
+  profile.assets = [
+    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+  ];
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  let stagedBeforeBuildCall = false;
+  await runGenerate({
+    paths,
+    config,
+    version: 1,
+    client,
+    profile,
+    interactive: false,
+    log,
+    engine: async (engineBin, opts) => {
+      if (opts.prompt.includes("building a production-quality marketing website")) {
+        stagedBeforeBuildCall = existsSync(join(opts.cwd, "src/assets/captured/logo.png"));
+      }
+      return fakeGenerateEngine()(engineBin, opts);
+    },
+    buildSite: fakeBuildOk,
+  });
+
+  // code stages the Asset itself — the Engine never has to locate or copy it
+  expect(stagedBeforeBuildCall).toBe(true);
+  expect(readFileSync(join(paths.versionDir(1), "src/assets/captured/logo.png"), "utf8")).toBe(
+    FAKE_ASSET_BYTES,
+  );
+});
+
+test("runGenerate warns (without failing) when a staged Asset is never referenced in the built Site", async () => {
   const { paths, profile } = await setupClientContext();
   mkdirSync(join(paths.context, "assets"), { recursive: true });
   writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
@@ -264,14 +298,14 @@ test("runGenerate warns (without failing) when a captured Asset never turns up i
     profile,
     interactive: false,
     log: { ...log, warn: (m) => warnings.push(m) },
-    engine: fakeGenerateEngine(), // never copies the captured logo into the Site
+    engine: fakeGenerateEngine(), // never references the staged logo from any source file
     buildSite: fakeBuildOk,
   });
 
   expect(warnings.some((w) => w.includes("logo (assets/logo.png)"))).toBe(true);
 });
 
-test("runGenerate does not warn when the captured Asset was actually copied into the Site", async () => {
+test("runGenerate does not warn when the staged Asset was actually referenced in the built Site", async () => {
   const { paths, profile } = await setupClientContext();
   mkdirSync(join(paths.context, "assets"), { recursive: true });
   writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
@@ -289,11 +323,85 @@ test("runGenerate does not warn when the captured Asset was actually copied into
     profile,
     interactive: false,
     log: { ...log, warn: (m) => warnings.push(m) },
-    engine: fakeGenerateEngine({ copyAssetTo: "src/assets/logo.png" }),
+    engine: fakeGenerateEngine({ referenceAsset: "assets/logo.png" }),
     buildSite: fakeBuildOk,
   });
 
   expect(warnings.some((w) => w.includes("logo"))).toBe(false);
+});
+
+test("runGenerate skips a Profile Asset missing from context/ instead of throwing", async () => {
+  const { paths, profile } = await setupClientContext();
+  // No file actually written under context/assets/ for this entry.
+  profile.assets = [
+    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+  ];
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  const warnings: string[] = [];
+  await runGenerate({
+    paths,
+    config,
+    version: 1,
+    client,
+    profile,
+    interactive: false,
+    log: { ...log, warn: (m) => warnings.push(m) },
+    engine: fakeGenerateEngine(),
+    buildSite: fakeBuildOk,
+  });
+
+  expect(warnings.some((w) => w.includes("missing from context/"))).toBe(true);
+  expect(existsSync(join(paths.versionDir(1), "src/assets/captured/logo.png"))).toBe(false);
+});
+
+test("runGenerate swaps in a captured icon as the favicon, mechanically, with no Engine involvement", async () => {
+  const { paths, profile } = await setupClientContext();
+  mkdirSync(join(paths.context, "assets"), { recursive: true });
+  writeFileSync(join(paths.context, "assets", "icon.png"), FAKE_ASSET_BYTES);
+  profile.assets = [
+    { role: "icon", file: "assets/icon.png", source: "captured", alt: "Tailored Co. favicon" },
+  ];
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  await runGenerate({
+    paths,
+    config,
+    version: 1,
+    client,
+    profile,
+    interactive: false,
+    log,
+    engine: fakeGenerateEngine(), // never touches favicons — this is code's job
+    buildSite: fakeBuildOk,
+  });
+
+  const versionDir = paths.versionDir(1);
+  expect(readFileSync(join(versionDir, "public/favicon.png"), "utf8")).toBe(FAKE_ASSET_BYTES);
+  expect(existsSync(join(versionDir, "public/favicon.svg"))).toBe(false); // Kit default removed
+  const layout = readFileSync(join(versionDir, "src/layouts/BaseLayout.astro"), "utf8");
+  expect(layout).toContain('<link rel="icon" type="image/png" href="/favicon.png" />');
+  // the icon isn't handed to the build call as something to decide about
+  expect(existsSync(join(versionDir, "src/assets/captured/icon.png"))).toBe(false);
+});
+
+test("runGenerate leaves the Kit's default favicon in place when no icon was captured", async () => {
+  const { paths, profile } = await setupClientContext();
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  await runGenerate({
+    paths,
+    config,
+    version: 1,
+    client,
+    profile,
+    interactive: false,
+    log,
+    engine: fakeGenerateEngine(),
+    buildSite: fakeBuildOk,
+  });
+
+  expect(existsSync(join(paths.versionDir(1), "public/favicon.svg"))).toBe(true);
 });
 
 test("runGenerate falls back to a Profile-derived Brief when the call omits brief.md", async () => {

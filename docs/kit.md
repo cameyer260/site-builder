@@ -30,19 +30,24 @@ ignore — develop it standalone (`cd kit && npm install && npm run dev`).
 
 ## How `generate` uses it
 
-1. `generate` derives the **Design Brief** (`sites/vN/.site-builder/brief.md`)
+1. It copies `kit/` into `sites/vN/`.
+2. Code stages the Client Profile's Assets into `src/assets/captured/`, and
+   swaps a captured favicon in over the Kit's placeholder when one exists —
+   both deterministic, no engine call involved. Which Assets to keep was
+   already decided in `synthesize`; there's nothing left to decide here, only
+   bytes to move.
+3. It `git init`s the directory — from here on, the Site Version is its own
+   repo and the Kit copy is independent of the source Kit.
+4. `generate` derives the **Design Brief** (`sites/vN/.site-builder/brief.md`)
    from the Client's industry, brand cues, and existing-site screenshots/logo,
    steerable with `--vibe`/`--style`. `.site-builder/` holds this and the
    declared stock-photo manifest — pipeline-internal artifacts, not Site
    content.
-2. It copies `kit/` into `sites/vN/` and `git init`s that directory — from here
-   on, the Site Version is its own repo and the Kit copy is independent of the
-   source Kit.
-3. The engine builds on top of the copy: rewrites `src/data/site.ts` with the
+5. The engine builds on top of the copy: rewrites `src/data/site.ts` with the
    Client Profile facts, re-themes by overriding `@theme` tokens in `global.css`,
-   adapts/adds/removes pages and components per the Profile, and wires in sourced
-   imagery.
-4. `astro build` is the **compile gate** — generation fails rather than emit a
+   adapts/adds/removes pages and components per the Profile, and references the
+   staged Assets and/or sourced stock imagery.
+6. `astro build` is the **compile gate** — generation fails rather than emit a
    site that doesn't build.
 
 The Kit is therefore a *starting point the engine edits*, not a frozen template.
@@ -66,7 +71,10 @@ breakdown. In short:
 - `src/data/site.ts` — the single source of business facts; the first file the
   engine rewrites per client.
 - `src/assets/` — `logo.png`, `hero.png`, `team.png`, re-exported via `index.ts`,
-  optimized through `astro:assets`. Replaced with client imagery when available.
+  optimized through `astro:assets`.
+- `src/assets/captured/` — not part of the Kit template; the Client's own
+  Assets, staged here by `generate` before the engine runs. Referenced from
+  `index.ts` in place of the Kit's defaults when available.
 - `@/*` import alias → `src/*`.
 
 ## Maintaining the Kit

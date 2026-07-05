@@ -131,16 +131,20 @@ Each is a thin adapter over a domain module:
 - **`synthesize`** (`src/synthesize/`) — engine call A classifies + renames image
   Assets (vision, Sonnet); engine call B writes the Client Profile (`profile.md` +
   `profile.json` field statuses) and a "what we still need to know" Checklist.
-- **`generate`** (`src/generate/`, ADR-0005/0006) — derives the Design Brief
-  (`.site-builder/brief.md`, brand-color extraction, `--vibe`/`--style`), copies
-  the [Kit](kit.md) into `sites/vN/`, `git init`s it, has the engine build on top
-  invoking the `ui-ux-pro-max` skill, sources imagery (`pexels.ts` three-tier
-  rule, slots declared in `.site-builder/images.json`), and gates on
-  `astro build`. Pipeline-internal artifacts (the Brief, the image manifest) live
-  under `.site-builder/` (`artifacts.ts`) rather than the project root, so they
-  read as tool metadata rather than mystery files once the Site Version evolves
-  into a production repo. An optional [QA session](../CONTEXT.md) (`qa.ts`) gates
-  between phases on an interactive TTY.
+- **`generate`** (`src/generate/`, ADR-0005/0006) — copies the [Kit](kit.md) into
+  `sites/vN/`, stages every Profile Asset into `src/assets/captured/`
+  (`assets.ts` — which Assets to keep was already decided in `synthesize`, so
+  code moves the bytes and the build prompt only points at the result), `git
+  init`s it, derives the Design Brief (`.site-builder/brief.md`, brand-color
+  extraction, `--vibe`/`--style`), has the engine build on top invoking the
+  `ui-ux-pro-max` skill, sources imagery (`pexels.ts` three-tier rule, slots
+  declared in `.site-builder/images.json`), and gates on `astro build`. A
+  best-effort, non-gating check (`assets.ts`) warns when a staged Asset is never
+  referenced by the built Site. Pipeline-internal artifacts (the Brief, the image
+  manifest) live under `.site-builder/` (`artifacts.ts`) rather than the project
+  root, so they read as tool metadata rather than mystery files once the Site
+  Version evolves into a production repo. An optional [QA session](../CONTEXT.md)
+  (`qa.ts`) gates between phases on an interactive TTY.
 - **`audit`** (`src/audit/`, ADR-0007) — serves the built `dist/`
   (`src/astro/preview.ts`), one deterministic pass (`inspect.ts`: reused
   screenshot component + axe-core + broken-link/asset check → `checks.json`), a

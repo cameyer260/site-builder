@@ -23,6 +23,10 @@ It builds clean with `npm run build` and type-checks with `npm run check`.
   hours, nav, socials, footer groups). The first file to edit per client.
 - `src/assets/` — `logo.png`, `hero.png`, `team.png`, re-exported from
   `index.ts`. Optimized via `astro:assets` at build.
+- `src/assets/captured/` — the Client's own real Assets (logo, photos), already
+  staged here by the pipeline before you run. Not part of the Kit template
+  itself — reference the ones that fit from `index.ts` instead of the Kit's
+  own `logo.png`/`hero.png`/`team.png` placeholders or fetched stock.
 - Imports use the `@/*` alias → `src/*` (configured in `tsconfig.json`).
 
 ## What to preserve
@@ -41,8 +45,9 @@ It builds clean with `npm run build` and type-checks with `npm run check`.
 ## What to tailor
 
 - Replace `src/data/site.ts` with the Client Profile facts.
-- Replace the images in `src/assets/` with client-specific captured, generated,
-  or fetched imagery when available (keep the export names in `index.ts`).
+- Replace the images in `src/assets/` with the Client's real Assets from
+  `src/assets/captured/` when available, falling back to fetched stock
+  imagery otherwise (keep the export names in `index.ts`).
 - Re-theme by overriding `@theme` tokens in `global.css` first (the brand ramp
   drives nav, buttons, links, mesh gradients, and accents) before reaching for
   hardcoded colors.
