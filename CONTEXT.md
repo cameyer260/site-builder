@@ -121,3 +121,17 @@ A tool-provided default (e.g. a generic logo) used in the generated Site when th
 **Image sourcing**:
 The three-tier rule for non-logo imagery during `generate`: (1) the Client's real captured Assets when good enough — code stages these into the Site before the Engine runs, so the Engine only decides whether/where to reference one, never locates or copies it; (2) **Pexels** stock fetched at generate time — the Engine declares each slot's intent and search keywords, code does the fetch/download and hands files to Astro `<Image>`; (3) the curated Fallback Asset pack for offline / no-API-key. Tier 2 needs a Pexels API key (managed by `sb config`).
 _Avoid_: placeholder, media library
+
+## Removal
+
+**Remove**:
+The operation that permanently erases a Client and all their data, or a single Site Version, and tears down the external resources created for them. Scoped whole-Client (`sb remove <client>`) or per–Site-Version (`sb remove <client> --version n`). The deliberate inverse of the create path (`generate`/`deploy`/`push`): it deletes the local files, the hosted Cloudflare deployment(s), and any GitHub repos, then drops the CRM pointer. Irreversible — a Site Version's local `sites/vN` git repo is often the only surviving copy of its history, so Remove always confirms first (retype the slug) unless `--yes`.
+_Avoid_: delete, destroy, purge, wipe, rm (the operation is Remove; "delete" names only the underlying per-resource API call)
+
+**Teardown**:
+The external half of a Remove: deleting a Site Version's hosted Cloudflare Pages deployment (matched to its recorded `deployUrl`), or the whole per-Client Pages project when the Client — or the Client's last remaining Version — is removed; plus deleting each Site Version's GitHub repo. Best-effort and reported per resource: a Version with no recorded URL/remote skips that step **with a warning**, and a failed Teardown aborts the local deletion (so a live Site or repo is never silently orphaned) unless `--force`.
+_Avoid_: cleanup, uninstall, unpublish
+
+**Compaction**:
+Keeping Site Version numbers gapless after a per-Version Remove: every surviving Version above the removed one shifts down by one (remove v3 of v2–v5 → v4 becomes v3, v5 becomes v4). A shift rewrites the number everywhere it lives — the `sites/vN` directory name, the generation `state.json` version, and the `SiteVersionRef` in `client.json` — and renames the Version's GitHub repo (`<slug>-vN`), re-recording the new remote. The Cloudflare deployment URL is immutable and not derived from the number, so it is left as-is. There are never holes in the `vN` sequence.
+_Avoid_: renumber (the mechanism, not the term), reindex, resequence

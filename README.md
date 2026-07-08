@@ -222,6 +222,35 @@ git repo and records the remote. Orthogonal to deploy — a live link never depe
 on it ([ADR-0004](docs/adr/0004-deploy-via-wrangler-direct-upload.md)). Defaults
 to the latest version.
 
+### `remove` — permanently erase a Client or one Site Version
+
+```
+sb remove <client> [--version <n>] [--yes] [--dry-run] [--local-only] [--force]
+```
+
+The inverse of the create path
+([ADR-0012](docs/adr/0012-removal-and-teardown.md)): tears down external
+resources before touching anything local, then deletes local state.
+
+- No `--version` — removes the whole Client: every recorded GitHub repo, the
+  Client's Cloudflare Pages project, and its entire directory.
+- `--version n` — removes just that Site Version: its GitHub repo and Cloudflare
+  deployment (or the whole project, if it's the Client's last remaining
+  Version), then its directory. Every higher Version shifts down by one
+  (Compaction) so the `vN` sequence stays gapless — its dir is renamed, its
+  `state.json` renumbered, and its GitHub repo renamed to match.
+
+Confirms interactively (retype the Client's slug) unless `--yes`. `--dry-run`
+prints exactly what would be torn down without changing anything. A Version
+with no recorded deploy URL/GitHub remote is skipped with a warning rather than
+failing. If any external teardown fails, local data is left intact — pass
+`--force` to delete it anyway. `--local-only` skips external teardown entirely
+(local files + the CRM record only).
+
+Deleting a repo needs the `delete_repo` gh scope
+(`gh auth refresh -h github.com -s delete_repo`); `sb config doctor` flags this
+as a warning, non-gating like the rest of the `gh` checks.
+
 ### CRM commands
 
 | Command | What it does |
@@ -345,8 +374,8 @@ it.
 | `engines.opencode.bin` | `opencode` | Binary for the opencode engine. |
 | `engines.opencode.models.best` | `openrouter/deepseek/deepseek-v4-pro` | generate + audit + synthesize. |
 | `engines.opencode.models.small` | `openrouter/deepseek/deepseek-v4-flash` | assetClassification + Design Brief. |
-| `wranglerBin` | `wrangler` | Cloudflare deploy. |
-| `ghBin` | `gh` | Only for `--github` / `sb push`. |
+| `wranglerBin` | `wrangler` | Cloudflare deploy, and Cloudflare teardown for `sb remove`. |
+| `ghBin` | `gh` | For `--github` / `sb push`, and GitHub teardown for `sb remove`. |
 | `pexelsApiKey` | *(unset)* | Enables tier-2 stock imagery. |
 | `viewports.desktop` / `viewports.mobile` | `1440` / `390` | Screenshot Viewport Profiles. |
 | `pageCap` | `10` | Default crawl cap; override per run with `--pages`. |

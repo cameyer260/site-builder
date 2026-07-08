@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -132,4 +132,24 @@ export function versionMarkerPath(paths: ClientPaths, version: number): string {
 /** Whether Site Version `version` under `paths` already built to completion. */
 export function isVersionBuilt(paths: ClientPaths, version: number): boolean {
   return existsSync(versionMarkerPath(paths, version));
+}
+
+/** Deletes a Client's entire directory tree (`sb remove`, whole-Client scope, ADR-0012). */
+export function removeClientDir(paths: ClientPaths): void {
+  rmSync(paths.dir, { recursive: true, force: true });
+}
+
+/** Deletes one Site Version's directory (`sb remove --version n`, ADR-0012). */
+export function removeVersionDir(paths: ClientPaths, version: number): void {
+  rmSync(paths.versionDir(version), { recursive: true, force: true });
+}
+
+/**
+ * Renames Site Version `from`'s directory into `to`'s slot (Removal's
+ * Compaction, ADR-0012). Callers shift versions in ascending order so `to`'s
+ * slot is always already vacated — by the removed Version's own deletion, or
+ * by the previous iteration's rename — before this runs.
+ */
+export function renameVersionDir(paths: ClientPaths, from: number, to: number): void {
+  renameSync(paths.versionDir(from), paths.versionDir(to));
 }

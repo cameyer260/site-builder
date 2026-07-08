@@ -5,7 +5,13 @@ import { join } from "node:path";
 import type { CommandResult } from "../src/astro/run.ts";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
 import { runDeploy } from "../src/deploy/deploy.ts";
-import { type DeployRunner, pagesProjectName, parsePagesUrl } from "../src/deploy/wrangler.ts";
+import {
+  type DeployRunner,
+  isActiveProductionDeploymentError,
+  pagesProjectName,
+  parseDeploymentList,
+  parsePagesUrl,
+} from "../src/deploy/wrangler.ts";
 import { newClient, readClient, recordSiteVersion, writeClient } from "../src/storage/client.ts";
 import { clientPaths } from "../src/storage/layout.ts";
 import { createLogger } from "../src/util/log.ts";
@@ -130,6 +136,58 @@ test("parsePagesUrl picks the last pages.dev link and strips trailing punctuatio
   ].join("\n");
   expect(parsePagesUrl(output)).toBe("https://a1b2c3.tailored-co.pages.dev");
   expect(parsePagesUrl("no link here")).toBeUndefined();
+});
+
+test("parseDeploymentList reads wrangler's real --json shape (capitalized display keys, not the raw API's id/url)", () => {
+  // Shaped exactly like `data.map(...)` in wrangler's pagesDeploymentListCommand
+  // handler (src/pages/deployments.ts) — verified by reading the installed CLI,
+  // since this subcommand has no documented --json schema.
+  const output = JSON.stringify([
+    {
+      Id: "a1b2c3d4-0000-0000-0000-000000000001",
+      Environment: "Production",
+      Branch: "main",
+      Source: "abcdef1",
+      Deployment: "https://a1b2c3.tailored-co.pages.dev",
+      Status: "2026-01-01T00:00:00Z",
+      Build: "https://dash.cloudflare.com/acct/pages/view/tailored-co/a1b2c3d4",
+    },
+    {
+      Id: "a1b2c3d4-0000-0000-0000-000000000002",
+      Environment: "Production",
+      Branch: "main",
+      Source: "abcdef2",
+      Deployment: "https://d4e5f6.tailored-co.pages.dev",
+      Status: "2026-01-02T00:00:00Z",
+      Build: "https://dash.cloudflare.com/acct/pages/view/tailored-co/a1b2c3d5",
+    },
+  ]);
+  expect(parseDeploymentList(output)).toEqual([
+    { id: "a1b2c3d4-0000-0000-0000-000000000001", url: "https://a1b2c3.tailored-co.pages.dev" },
+    { id: "a1b2c3d4-0000-0000-0000-000000000002", url: "https://d4e5f6.tailored-co.pages.dev" },
+  ]);
+});
+
+test("parseDeploymentList returns [] for unparseable or unexpectedly shaped output", () => {
+  expect(parseDeploymentList("not json")).toEqual([]);
+  expect(parseDeploymentList('{"not": "an array"}')).toEqual([]);
+  // the raw API's lowercase id/url shape, not wrangler's display shape — must not match
+  expect(parseDeploymentList(JSON.stringify([{ id: "x", url: "https://x.pages.dev" }]))).toEqual(
+    [],
+  );
+});
+
+test("isActiveProductionDeploymentError matches wrangler's real error text and code", () => {
+  const real = [
+    "✘ [ERROR] A request to the Cloudflare API (/accounts/x/pages/projects/acme/deployments/y) failed.",
+    "",
+    "  You cannot delete the active production deployment. [code: 8000034]",
+  ].join("\n");
+  expect(isActiveProductionDeploymentError(real)).toBe(true);
+  // matches on the code alone too, in case wrangler ever reflows the message text
+  expect(isActiveProductionDeploymentError("boom [code: 8000034]")).toBe(true);
+  expect(isActiveProductionDeploymentError("Authentication error [code: 10000]")).toBe(false);
+  expect(isActiveProductionDeploymentError("")).toBe(false);
 });
 
 test("pagesProjectName keeps the slug but caps it at 58 chars", () => {

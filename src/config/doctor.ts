@@ -73,9 +73,12 @@ function checkRoot(root: string): CheckResult {
 }
 
 /**
- * GitHub CLI for the opt-in `--github`/`sb push` flow (ADR-0004). Non-required:
- * the core promise (a live link) comes from deploy alone, so a missing/unauthed
- * `gh` only warns. When present, `gh auth status` is cheap and worth probing.
+ * GitHub CLI for the opt-in `--github`/`sb push` flow (ADR-0004) and for
+ * `sb remove`'s GitHub teardown (ADR-0012). Non-required: the core promise (a
+ * live link) comes from deploy alone, so a missing/unauthed `gh` only warns.
+ * When present, `gh auth status` is cheap and worth probing — though it can't
+ * confirm the `delete_repo` scope `sb remove` additionally needs
+ * (`gh auth refresh -h github.com -s delete_repo`), only that some token exists.
  */
 function checkGitHub(bin: string): CheckResult {
   if (!binaryPresent(bin)) {
@@ -83,7 +86,7 @@ function checkGitHub(bin: string): CheckResult {
       name: `github cli (${bin})`,
       ok: false,
       required: false,
-      detail: "not found — `--github`/`sb push` will be unavailable",
+      detail: "not found — `--github`/`sb push`/`sb remove` will be unavailable",
     };
   }
   const r = spawnSync(bin, ["auth", "status"], { encoding: "utf8" });
@@ -92,7 +95,9 @@ function checkGitHub(bin: string): CheckResult {
     name: "github cli auth",
     ok: authed,
     required: false,
-    detail: authed ? "authenticated" : "present but not authenticated — run `gh auth login`",
+    detail: authed
+      ? "authenticated (sb remove also needs the delete_repo scope)"
+      : "present but not authenticated — run `gh auth login`",
   };
 }
 

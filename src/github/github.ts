@@ -65,3 +65,90 @@ export const publishToGitHub: GitHubPublisher = async ({ siteDir, repoName, ghBi
   const remote = result.ok ? (remoteUrl(siteDir) ?? parseRemoteUrl(result.output)) : undefined;
   return { ok: result.ok, remote, output: result.output };
 };
+
+/**
+ * The GitHub teardown seams for `sb remove` (ADR-0012): deleting a Site
+ * Version's repo outright, and renaming one during Removal's Compaction (a
+ * shifted Version keeps its repo, just renumbered to match its new slot).
+ * Both take the already-known `owner/repo` slug — parsed from the stored
+ * `remote` by {@link repoSlugFromRemote} — rather than re-deriving it, since
+ * `client.json` is the only remaining record once the local checkout is gone.
+ */
+
+/** Pulls `owner/repo` out of a stored `https://github.com/<owner>/<repo>` remote URL. */
+export function repoSlugFromRemote(remote: string): string | undefined {
+  return remote.match(/github\.com\/([\w.-]+\/[\w.-]+)/)?.[1];
+}
+
+export interface DeleteRepoParams {
+  /** `owner/repo`, parsed from the stored remote. */
+  repo: string;
+  /** Working directory for the gh CLI call — the repo is addressed explicitly, so this is only for consistency/logging. */
+  cwd: string;
+  /** The gh binary (`config.ghBin`). */
+  ghBin: string;
+  log: Logger;
+}
+
+export interface GitHubDeleteResult {
+  ok: boolean;
+  output: string;
+}
+
+/** The injectable shape `remove` accepts for deleting a repo outright. */
+export type GitHubRepoDeleter = (params: DeleteRepoParams) => Promise<GitHubDeleteResult>;
+
+const DELETE_TIMEOUT_MS = 60_000;
+const RENAME_TIMEOUT_MS = 60_000;
+
+/**
+ * The real deleter: `gh repo delete <owner/repo> --yes`. Deletion requires the
+ * `delete_repo` scope on top of the base `gh auth login` (`config doctor` notes
+ * this); a missing scope surfaces as a failed result, never a thrown error.
+ */
+export const deleteGitHubRepo: GitHubRepoDeleter = async ({ repo, cwd, ghBin, log }) => {
+  log.step(`remove: deleting GitHub repo "${repo}"`);
+  const result = await runCommand(ghBin, ["repo", "delete", repo, "--yes"], {
+    cwd,
+    log,
+    timeoutMs: DELETE_TIMEOUT_MS,
+  });
+  return { ok: result.ok, output: result.output };
+};
+
+export interface RenameRepoParams {
+  /** Current `owner/repo`, parsed from the stored remote. */
+  repo: string;
+  /** The new repo name (bare, same owner) — the shifted Version's `<slug>-vN`. */
+  newName: string;
+  /** Working directory for the gh CLI call — see {@link DeleteRepoParams.cwd}. */
+  cwd: string;
+  /** The gh binary (`config.ghBin`). */
+  ghBin: string;
+  log: Logger;
+}
+
+export interface RenameRepoResult {
+  ok: boolean;
+  /** The renamed repo's new remote URL, reconstructed from `owner` + `newName`. */
+  remote?: string;
+  output: string;
+}
+
+/** The injectable shape `remove` accepts for renaming a repo during Compaction. */
+export type GitHubRepoRenamer = (params: RenameRepoParams) => Promise<RenameRepoResult>;
+
+/** The real renamer: `gh repo rename <newName> -R <owner/repo> --yes`. */
+export const renameGitHubRepo: GitHubRepoRenamer = async ({ repo, newName, cwd, ghBin, log }) => {
+  log.step(`remove: renaming GitHub repo "${repo}" → "${newName}"`);
+  const result = await runCommand(ghBin, ["repo", "rename", newName, "-R", repo, "--yes"], {
+    cwd,
+    log,
+    timeoutMs: RENAME_TIMEOUT_MS,
+  });
+  if (!result.ok) {
+    return { ok: false, output: result.output };
+  }
+  const owner = repo.split("/")[0];
+  return { ok: true, remote: `https://github.com/${owner}/${newName}`, output: result.output };
+};

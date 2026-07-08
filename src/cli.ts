@@ -4,6 +4,7 @@ import { configCommand } from "./commands/config.ts";
 import { editCommand } from "./commands/edit.ts";
 import { listCommand } from "./commands/list.ts";
 import { pushCommand } from "./commands/push.ts";
+import { removeCommand } from "./commands/remove.ts";
 import { resumeCommand } from "./commands/resume.ts";
 import { setCommand } from "./commands/set.ts";
 import { showCommand } from "./commands/show.ts";
@@ -35,6 +36,11 @@ Commands:
                          resume is already past the generate stage)
   push <client>          Publish a Site Version's source to a private GitHub repo
                          flags: --version <n>
+  remove <client>        Permanently erase a Client and all their data, or one
+                         Site Version — tears down its Cloudflare deploy(s) and
+                         GitHub repo(s) first, then the local files
+                         flags: --version <n> (else the whole Client) --yes
+                         (skip confirmation) --dry-run --local-only --force
 
   list                   List all Clients and their latest deploy links
   show <client>          Show a Client's CRM record
@@ -69,6 +75,8 @@ export async function main(argv: string[]): Promise<number> {
         return await resumeCommand(rest);
       case "push":
         return await pushCommand(rest);
+      case "remove":
+        return await removeCommand(rest);
       case "list":
         return await listCommand(rest);
       case "show":

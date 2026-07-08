@@ -42,3 +42,13 @@ export function remoteUrl(cwd: string): string | null {
   const url = (r.stdout ?? "").trim();
   return url.length > 0 ? url : null;
 }
+
+/**
+ * Best-effort `git remote set-url origin <url>` in `cwd` — used when a Site
+ * Version's GitHub repo is renamed during Removal's Compaction (ADR-0012), so
+ * the local checkout's `origin` stays pointed at the repo's new name. Returns
+ * false (without throwing) if git or the remote is unavailable.
+ */
+export function setRemoteUrl(cwd: string, url: string): boolean {
+  return git(cwd, "remote", "set-url", "origin", url);
+}

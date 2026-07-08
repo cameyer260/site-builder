@@ -124,3 +124,36 @@ export function markFailed(state: State, stage: string, error: string): void {
   state.stages[stage] = rec;
   state.lastRun = { status: "failed", stage, at: nowIso(), error };
 }
+
+/**
+ * Rewrites the `version` field of a generation-phase `state.json` in place —
+ * Removal's Compaction (ADR-0012) calls this immediately after renaming the
+ * Site Version's directory into its new slot, so the file's own `version`
+ * still matches the dir it lives in. A no-op if no state file exists at
+ * `statePath` (a Version can be shifted without ever having run past `init`).
+ */
+export function renumberState(statePath: string, version: number): void {
+  const state = readState(statePath);
+  if (!state) {
+    return;
+  }
+  state.version = version;
+  writeState(statePath, state);
+}
+
+/**
+ * Clears a context-phase `targetVersion` pointer once it references a Version
+ * number a removal has invalidated (Removal's Compaction, ADR-0012): after
+ * `sb remove --version n`, any recorded target `>= n` no longer names the
+ * right future slot — `nextVersion` should recompute it fresh instead of
+ * resuming toward a number Compaction has already shifted or freed. A no-op
+ * if there is no context state or no target recorded.
+ */
+export function clearStaleTargetVersion(statePath: string, threshold: number): void {
+  const state = readState(statePath);
+  if (state?.targetVersion === undefined || state.targetVersion < threshold) {
+    return;
+  }
+  state.targetVersion = undefined;
+  writeState(statePath, state);
+}

@@ -26,7 +26,9 @@ CLI — the **Engine** (`claudey` by default, or `codey`/`opencode` via `--engin
   contract, not re-architecture), 0010 (pluggable Engines: `claudey`/`codey`/
   `opencode` behind a per-CLI adapter, selected per run with `--engine`), 0011
   (captured Assets are staged into the Site Version by code before the build
-  call runs, not copied by the Engine).
+  call runs, not copied by the Engine), 0012 (removal & teardown: `sb remove`
+  is the inverse of create — external teardown first, then gapless Site Version
+  compaction).
 - **`docs/roadmap.md`** — what is *explicitly out of scope for v1*; don't build these
   without being asked.
 

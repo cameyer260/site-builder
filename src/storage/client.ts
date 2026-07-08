@@ -181,6 +181,24 @@ export function setClientField(clientJsonPath: string, key: string, value: strin
 }
 
 /**
+ * Replaces the Client's entire `sites` array, re-sorted by version and
+ * persisted in one write. `sb remove --version n` needs this rather than
+ * {@link recordSiteVersion}'s single-ref upsert: dropping the removed Version
+ * and shifting every higher one down by one (Removal's Compaction, ADR-0012)
+ * changes several refs — including patching in a renamed GitHub repo's new
+ * remote — as one atomic set, not a sequence of per-ref merges.
+ */
+export function setSiteVersions(clientJsonPath: string, sites: SiteVersionRef[]): Client {
+  const client = readClient(clientJsonPath);
+  if (!client) {
+    throw new UserError(`cannot set Site Versions: no client.json at ${clientJsonPath}`);
+  }
+  const next: Client = { ...client, sites: [...sites].sort((a, b) => a.version - b.version) };
+  writeClient(clientJsonPath, next);
+  return next;
+}
+
+/**
  * Uniqueness guard: refuses to create a Client when one already exists at the
  * slug. `build` is for new Clients; continuing an existing one uses
  * `resume`/`variant` (ADR-0002).
