@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildSite, ensureBuiltDist, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
@@ -8,30 +8,26 @@ import { stageEngineDefaults } from "../engine/stage.ts";
 import { STAGE_TIER } from "../engine/tiers.ts";
 import { profilesFromConfig } from "../playwright/screenshot.ts";
 import type { Client } from "../storage/client.ts";
-import type { ClientPaths } from "../storage/layout.ts";
+import { ARTIFACTS_DIRNAME, type ClientPaths } from "../storage/layout.ts";
 import { UserError } from "../util/errors.ts";
 import { commitAll } from "../util/git.ts";
 import type { Logger } from "../util/log.ts";
 import { nowIso } from "../util/time.ts";
 import { type InspectResult, inspectBuiltSite, type SiteInspector } from "./inspect.ts";
-import {
-  type LighthouseRunner,
-  renderScorecardTable,
-  runLighthouseScorecard,
-  type Scorecard,
-} from "./lighthouse.ts";
+import { type LighthouseRunner, runLighthouseScorecard, type Scorecard } from "./lighthouse.ts";
 import { AUDIT_SYSTEM_PROMPT, buildAuditPrompt } from "./prompts.ts";
 
 /**
  * The real `audit` stage (ADR-0007). Against the locally
  * built Site it: (1) ensures the Site is built, (2) serves it and runs the
  * deterministic fix-drivers (screenshots, axe-core, broken-link/asset check)
- * into `audit/checks.json`, (3) has the engine review + apply ONE fix pass
- * (writing `audit/audit.md`), (4) re-gates with `astro build` — the only hard
- * gate, and (5) measures the fixed Site with Lighthouse to produce the
- * **Scorecard** (`audit/lighthouse.json` + a table prepended to `audit.md`),
- * which is recorded but never blocks. Review + fix only; the multi-pass loop and
- * score gating are deferred (ADR-0007). Owns the `audit/` dir under the version.
+ * into a transient `audit/` working dir, (3) has the engine review + apply ONE
+ * fix pass (writing `audit/audit.md`), (4) re-gates with `astro build` — the only
+ * hard gate, and (5) measures the fixed Site with Lighthouse to produce the
+ * **Scorecard**, persisted as `.site-builder/lighthouse.json` (recorded, never
+ * gating). The transient `audit/` working dir — checks, screenshots, findings —
+ * is deleted after the re-gate; only the Scorecard persists. Review + fix only;
+ * the multi-pass loop and score gating are deferred (ADR-0007).
  */
 
 const AUDIT_BUDGET_USD = 6;
@@ -79,7 +75,6 @@ export async function runAudit(params: AuditParams): Promise<void> {
 
   const versionDir = paths.versionDir(version);
   const auditDir = join(versionDir, "audit");
-  const auditMdPath = join(auditDir, "audit.md");
   const checksPath = join(auditDir, "checks.json");
   mkdirSync(auditDir, { recursive: true });
 
@@ -129,9 +124,6 @@ export async function runAudit(params: AuditParams): Promise<void> {
   if (!review.ok) {
     throw new UserError(`audit: AI review failed: ${engineFailureReason(review)}`);
   }
-  // The findings file must always exist (milestone): synthesize one from the
-  // deterministic checks if the model didn't write its own.
-  ensureAuditMd(auditMdPath, client.name, inspection);
 
   // 4. Re-gate: the fix pass must still compile. This is the only hard gate.
   log.step("audit: re-running astro build after the fix pass");
@@ -145,9 +137,13 @@ export async function runAudit(params: AuditParams): Promise<void> {
 
   // 5. Scorecard: Lighthouse per form factor on the fixed Site. Non-gating —
   //    a failure to measure is recorded as absent, never failing the stage.
-  await writeScorecard({ auditMdPath, auditDir, siteDir: versionDir, lighthouse, log });
+  await writeScorecard({ versionDir, lighthouse, log });
 
-  // 6. Snapshot the audit fixes in the version's git history (best-effort).
+  // 6. Drop the transient working artifacts (checks, screenshots, findings); only
+  //    the Scorecard (now under .site-builder/) persists (ADR-0007).
+  rmSync(auditDir, { recursive: true, force: true });
+
+  // 7. Snapshot the audit fixes in the version's git history (best-effort).
   if (commitAll(versionDir, "fix: audit pass")) {
     log.step("audit: committed fix pass");
   }
@@ -182,59 +178,19 @@ function logInspection(inspection: InspectResult, log: Logger): void {
   );
 }
 
-/** Writes a fallback `audit.md` from the deterministic checks when the model omitted one. */
-function ensureAuditMd(path: string, clientName: string, inspection: InspectResult): void {
-  if (existsSync(path)) {
-    return;
-  }
-  const lines: string[] = [
-    `# Audit — ${clientName}`,
-    "",
-    "_Findings from the deterministic checks (the AI review produced no file)._",
-    "",
-  ];
-
-  lines.push("## Accessibility", "");
-  const withViolations = inspection.axe.filter((p) => p.violations.length > 0);
-  if (withViolations.length === 0) {
-    lines.push("No axe-core violations detected.", "");
-  } else {
-    for (const page of withViolations) {
-      lines.push(`### ${page.slug}`, "");
-      for (const v of page.violations) {
-        lines.push(`- **${v.id}** (${v.impact ?? "n/a"}, ${v.nodes} node(s)): ${v.help}`);
-      }
-      lines.push("");
-    }
-  }
-
-  lines.push("## Links & assets", "");
-  if (inspection.brokenRefs.length === 0) {
-    lines.push("No broken internal links or assets detected.", "");
-  } else {
-    for (const ref of inspection.brokenRefs) {
-      lines.push(`- ${ref.kind} ${ref.url} → ${ref.status ?? "unreachable"} (on ${ref.foundOn})`);
-    }
-    lines.push("");
-  }
-
-  writeFileSync(path, lines.join("\n"));
-}
-
 interface WriteScorecardParams {
-  auditMdPath: string;
-  auditDir: string;
-  siteDir: string;
+  /** The Site Version dir; the Scorecard lands in its `.site-builder/`. */
+  versionDir: string;
   lighthouse: LighthouseRunner;
   log: Logger;
 }
 
-/** Runs Lighthouse, persists the Scorecard, and prepends its table to `audit.md`. */
+/** Runs Lighthouse and persists the Scorecard as `.site-builder/lighthouse.json`. */
 async function writeScorecard(params: WriteScorecardParams): Promise<void> {
-  const { auditMdPath, auditDir, siteDir, lighthouse, log } = params;
+  const { versionDir, lighthouse, log } = params;
   let scorecard: Scorecard;
   try {
-    scorecard = await lighthouse({ siteDir, log });
+    scorecard = await lighthouse({ siteDir: versionDir, log });
   } catch (err) {
     log.warn(
       `audit: Lighthouse Scorecard unavailable: ${err instanceof Error ? err.message : String(err)} (non-gating)`,
@@ -242,11 +198,9 @@ async function writeScorecard(params: WriteScorecardParams): Promise<void> {
     return;
   }
 
-  writeFileSync(join(auditDir, "lighthouse.json"), `${JSON.stringify(scorecard, null, 2)}\n`);
-
-  const table = renderScorecardTable(scorecard);
-  const existing = existsSync(auditMdPath) ? readFileSync(auditMdPath, "utf8") : "";
-  writeFileSync(auditMdPath, `${table}\n${existing}`);
+  const artifactsDir = join(versionDir, ARTIFACTS_DIRNAME);
+  mkdirSync(artifactsDir, { recursive: true });
+  writeFileSync(join(artifactsDir, "lighthouse.json"), `${JSON.stringify(scorecard, null, 2)}\n`);
 
   logScorecard(scorecard, log);
 }

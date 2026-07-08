@@ -345,10 +345,9 @@ the registry — no central index file.
     ├── context/             # Client Profile (Markdown + JSON sidecar) + Checklist gaps
     └── sites/
         └── v1/
-            ├── state.json   # generation-phase state
-            ├── brief.md     # the Design Brief
-            ├── audit/       # checks.json, audit.md, lighthouse.json (the Scorecard)
-            └── …            # the Astro project (its own git repo)
+            ├── state.json     # generation-phase state (gitignored)
+            ├── .site-builder/ # pipeline metadata: brief.md, images.json, lighthouse.json (Scorecard), .generated
+            └── …              # the Astro project (its own git repo)
 ```
 
 `client.json` is yours to edit; `state.json` is the machine's — never hand-edit
@@ -411,8 +410,8 @@ on purpose rather than deploy a broken site. Check `sites/vN/` and the run log
 under `<client>/logs/`, then `sb resume`.
 
 **A low Lighthouse score.** Recorded in the Scorecard
-(`sites/vN/audit/lighthouse.json`), never blocking — Lighthouse is evidence, not
-a gate. v1 does one review + one fix pass; deeper score-chasing is deferred (see
+(`sites/vN/.site-builder/lighthouse.json`), never blocking — Lighthouse is
+evidence, not a gate. v1 does one review + one fix pass; deeper score-chasing is deferred (see
 [roadmap.md](docs/roadmap.md)).
 
 **`at least one Input is required for a new Client`** — a brand-new Client needs

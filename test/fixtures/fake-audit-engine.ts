@@ -28,8 +28,6 @@ const fail = (): EngineResult => ({
 export interface FakeAuditEngineOptions {
   /** Make the review call report failure. */
   failReview?: boolean;
-  /** Review succeeds but writes no audit.md (exercises the fallback findings). */
-  skipAuditMd?: boolean;
 }
 
 export function fakeAuditEngine(options: FakeAuditEngineOptions = {}): EngineRunner {
@@ -38,13 +36,11 @@ export function fakeAuditEngine(options: FakeAuditEngineOptions = {}): EngineRun
       if (options.failReview) {
         return fail();
       }
-      if (!options.skipAuditMd) {
-        mkdirSync(join(opts.cwd, "audit"), { recursive: true });
-        writeFileSync(
-          join(opts.cwd, "audit", "audit.md"),
-          "# Audit\n\n## Summary\n\nLooks solid; minor fixes applied.\n",
-        );
-      }
+      mkdirSync(join(opts.cwd, "audit"), { recursive: true });
+      writeFileSync(
+        join(opts.cwd, "audit", "audit.md"),
+        "# Audit\n\n## Summary\n\nLooks solid; minor fixes applied.\n",
+      );
       return ok();
     }
     return ok();

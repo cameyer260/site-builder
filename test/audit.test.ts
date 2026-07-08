@@ -46,7 +46,7 @@ function setup(): { paths: ReturnType<typeof clientPaths>; versionDir: string } 
   return { paths, versionDir };
 }
 
-test("runAudit produces checks, findings, and a Scorecard, and re-gates the build", async () => {
+test("runAudit re-gates the build, persists the Scorecard, and clears the working dir", async () => {
   const { paths, versionDir } = setup();
   let regateCalls = 0;
 
@@ -64,48 +64,18 @@ test("runAudit produces checks, findings, and a Scorecard, and re-gates the buil
     lighthouse: fakeLighthouse,
   });
 
-  const auditDir = join(versionDir, "audit");
+  // the transient working dir (checks, screenshots, findings) is removed after the re-gate
+  expect(existsSync(join(versionDir, "audit"))).toBe(false);
 
-  // deterministic checks persisted with a summary
-  const checks = JSON.parse(readFileSync(join(auditDir, "checks.json"), "utf8"));
-  expect(checks.summary.pages).toBe(1);
-  expect(checks.summary.a11yViolations).toBe(1);
-  expect(checks.summary.brokenRefs).toBe(0);
-
-  // findings file written by the (fake) model, with the Scorecard table prepended
-  const auditMd = readFileSync(join(auditDir, "audit.md"), "utf8");
-  expect(auditMd).toContain("Lighthouse Scorecard");
-  expect(auditMd).toContain("Mobile");
-  expect(auditMd).toContain("Desktop");
-  expect(auditMd).toContain("minor fixes applied"); // the model's own findings survive below the table
-
-  // Scorecard persisted with both form factors
-  const lh: Scorecard = JSON.parse(readFileSync(join(auditDir, "lighthouse.json"), "utf8"));
+  // only the Scorecard persists, under .site-builder/, with both form factors
+  const lh: Scorecard = JSON.parse(
+    readFileSync(join(versionDir, ".site-builder", "lighthouse.json"), "utf8"),
+  );
   expect(lh.results.map((r) => r.formFactor).sort()).toEqual(["desktop", "mobile"]);
   expect(lh.results[0]?.scores.accessibility).toBe(100);
 
   // dist already existed, so only the post-fix re-gate ran (not ensureBuilt)
   expect(regateCalls).toBe(1);
-});
-
-test("runAudit writes a fallback audit.md from the checks when the model omits one", async () => {
-  const { paths, versionDir } = setup();
-
-  await runAudit({
-    paths,
-    config,
-    version: 1,
-    client,
-    log,
-    engine: fakeAuditEngine({ skipAuditMd: true }),
-    buildSite: fakeBuild(),
-    inspect: fakeInspect,
-    lighthouse: fakeLighthouse,
-  });
-
-  const auditMd = readFileSync(join(versionDir, "audit", "audit.md"), "utf8");
-  expect(auditMd).toContain("Lighthouse Scorecard"); // table still prepended
-  expect(auditMd).toContain("color-contrast"); // fallback rendered the axe finding
 });
 
 test("runAudit builds first when no dist is present", async () => {
@@ -192,11 +162,9 @@ test("runAudit keeps going (non-gating) when Lighthouse throws", async () => {
     },
   });
 
-  // stage succeeded; audit.md exists but has no Scorecard, and no lighthouse.json
-  const auditDir = join(versionDir, "audit");
-  expect(existsSync(join(auditDir, "audit.md"))).toBe(true);
-  expect(existsSync(join(auditDir, "lighthouse.json"))).toBe(false);
-  expect(readFileSync(join(auditDir, "audit.md"), "utf8")).not.toContain("Lighthouse Scorecard");
+  // stage succeeded: the working dir is cleaned up and no Scorecard was written
+  expect(existsSync(join(versionDir, "audit"))).toBe(false);
+  expect(existsSync(join(versionDir, ".site-builder", "lighthouse.json"))).toBe(false);
 });
 
 test("renderScorecardTable lays out both form factors and their categories", () => {

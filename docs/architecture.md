@@ -149,8 +149,10 @@ Each is a thin adapter over a domain module:
   (`src/astro/preview.ts`), one deterministic pass (`inspect.ts`: reused
   screenshot component + axe-core + broken-link/asset check → `checks.json`), a
   single engine review+fix pass (`audit.md`), `astro build` re-gate, then the
-  Lighthouse **Scorecard** (`lighthouse.json` + a table prepended to `audit.md`)
-  as **non-gating** evidence. `astro build` is the only hard gate.
+  Lighthouse **Scorecard** (`.site-builder/lighthouse.json`) as **non-gating**
+  evidence. `astro build` is the only hard gate. The `checks.json`, screenshots,
+  and `audit.md` live in a transient `audit/` working dir, deleted after the
+  re-gate; only the Scorecard persists.
 - **`deploy`** (`src/deploy/`, ADR-0004) — pure code, no AI, no GitHub. Ensures a
   built `dist/`, then `wrangler.ts` Direct-Uploads to Cloudflare Pages
   (`pages project create` — idempotent — then `pages deploy`), parses the

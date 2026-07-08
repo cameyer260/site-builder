@@ -4,9 +4,17 @@
 Accessibility, Best Practices, and SEO scores for a Site Version, per Lighthouse
 form factor (mobile + desktop). Lighthouse runs **once per form factor, after**
 the single AI review + fix pass, so the Scorecard reflects the Site that actually
-ships. It is **non-gating**: a low score is persisted under `sites/vN/audit/` and
-surfaced to the client as evidence, never failing the stage or blocking deploy.
-`astro build` remains the only hard gate.
+ships. It is **non-gating**: a low score is persisted as
+`sites/vN/.site-builder/lighthouse.json` and surfaced to the client as evidence,
+never failing the stage or blocking deploy. `astro build` remains the only hard
+gate.
+
+The deterministic checks, per-Profile screenshots, and the AI's findings file are
+stage-internal fix-drivers — built under a transient `sites/vN/audit/` working
+dir and **deleted after the re-gate**. Only the Scorecard (`lighthouse.json`,
+under `.site-builder/` with the rest of the pipeline metadata) persists into the
+Site Version's git history and the client-facing repo; the working artifacts do
+not.
 
 **Why not gate / loop.** The obvious design (and one an AI chat proposed) is a
 convergence loop — median-of-N Lighthouse runs → `audit → fix → re-audit` for

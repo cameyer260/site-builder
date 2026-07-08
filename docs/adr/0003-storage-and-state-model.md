@@ -31,6 +31,6 @@ Resulting layout:
     └── sites/
         └── v1/
             ├── state.json      ← generation-phase state (machine, gitignored)
-            ├── .site-builder/  ← pipeline artifacts (Brief, image manifest), not Site content
-            └── ...             ← Astro project (own git repo), audit/
+            ├── .site-builder/  ← pipeline artifacts (Brief, image manifest, Scorecard), not Site content
+            └── ...             ← Astro project (own git repo)
 ```

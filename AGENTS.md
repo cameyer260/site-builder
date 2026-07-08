@@ -119,11 +119,13 @@ generate time (ADR-0006), so `sb`'s appended system prompt stays thin.
 **`audit`** (`src/audit/`, ADR-0007). Runs against the locally built Site:
 `src/astro/preview.ts` serves `dist/`, then one deterministic pass
 (`inspect.ts`) reuses the screenshot component and runs **axe-core** + a
-broken-link/asset check into `audit/checks.json`. A single engine call reviews
-*and* applies one fix pass (writing `audit/audit.md`); `astro build` re-gates —
-the only hard gate. *After* the re-gate, Lighthouse (`lighthouse.ts`) records
-the **Scorecard** per form factor (`audit/lighthouse.json` + a table prepended
-to `audit.md`) as non-gating evidence — a low score is recorded, never blocking.
+broken-link/asset check into a transient `audit/` working dir. A single engine
+call reviews *and* applies one fix pass (writing `audit/audit.md`); `astro build`
+re-gates — the only hard gate. *After* the re-gate, Lighthouse (`lighthouse.ts`)
+records the **Scorecard** per form factor as `.site-builder/lighthouse.json` —
+non-gating evidence, a low score is recorded, never blocking. The transient
+`audit/` dir (checks, screenshots, findings) is deleted after the re-gate; only
+the Scorecard persists.
 Review + fix only; the multi-pass loop and score gating are deferred. Like
 `generate`, the heavy I/O is behind injectable seams — `RunContext.inspectSite`
 and `RunContext.runLighthouse` (alongside `engine`/`buildSite`) default to the

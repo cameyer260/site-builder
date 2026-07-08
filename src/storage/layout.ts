@@ -112,8 +112,9 @@ export function isDir(dir: string): boolean {
 /**
  * `.site-builder/` — the one directory inside a Site Version holding
  * pipeline-internal artifacts (Design Brief, image-sourcing manifest, the
- * completion marker below) instead of scattering them at the project root
- * (`src/generate/artifacts.ts` owns creating it and writing into it).
+ * `audit` Scorecard `lighthouse.json`, the completion marker below) instead of
+ * scattering them at the project root (`src/generate/artifacts.ts` owns creating
+ * it and writing into it; `audit` writes the Scorecard into it).
  */
 export const ARTIFACTS_DIRNAME = ".site-builder";
 
