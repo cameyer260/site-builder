@@ -26,6 +26,19 @@ export const ASSET_ROLES = [
   "other",
 ] as const;
 
+/**
+ * Roles capped at one kept Asset (there's only ever one brand mark, favicon,
+ * page background, or hero image in play) — reconciliation keeps the first
+ * and drops the rest, rather than trusting the classification prompt's
+ * "choose at most one" instruction to hold.
+ */
+export const SINGLETON_ASSET_ROLES = new Set<(typeof ASSET_ROLES)[number]>([
+  "logo",
+  "icon",
+  "background",
+  "hero",
+]);
+
 /** Shape of the `context/assets.json` the model writes (call A). */
 export const AssetClassificationSchema = z.object({
   assets: z.array(
@@ -34,7 +47,8 @@ export const AssetClassificationSchema = z.object({
       source: z.string(),
       role: z.enum(ASSET_ROLES),
       keep: z.boolean(),
-      alt: z.string().optional(),
+      /** What the image depicts — read by the text-only `generate` stage, which never sees it. */
+      description: z.string().optional(),
     }),
   ),
 });
@@ -118,8 +132,9 @@ function canonicalName(role: string, ext: string, counters: Map<string, number>)
  * Turns a classification into the canonical asset set under `context/assets/`:
  * copies each kept, on-disk Asset to a role-based name, and — when no logo was
  * found among the captured Assets — copies in the Fallback Asset. Returns the
- * asset manifest for `profile.json`. Best-effort and never throws; unreadable or
- * unmatched entries are skipped.
+ * asset manifest for `profile.json`. Best-effort and never throws; unreadable,
+ * unmatched, extra-singleton, or (for multi-instance roles) undescribed
+ * entries are skipped.
  */
 export function reconcileAssets(input: {
   classification: AssetClassification;
@@ -135,16 +150,35 @@ export function reconcileAssets(input: {
   const byPath = new Map(candidates.map((c) => [c.absPath, c]));
   const counters = new Map<string, number>();
   const usedNames = new Set<string>();
+  const seenSingletons = new Set<string>();
   const manifest: AssetManifestEntry[] = [];
 
   for (const entry of classification.assets) {
     if (!entry.keep) {
       continue;
     }
+    if (SINGLETON_ASSET_ROLES.has(entry.role) && seenSingletons.has(entry.role)) {
+      log.warn(
+        `synthesize: dropping extra ${entry.role} asset (${entry.source}) — only one ${entry.role} is kept`,
+      );
+      continue;
+    }
+    // Multi-instance roles can have several kept Assets of the same role, and
+    // `generate` never opens the image itself — without a description it has
+    // no way to tell them apart or pick the right one for a given spot.
+    if (!SINGLETON_ASSET_ROLES.has(entry.role) && !entry.description) {
+      log.warn(
+        `synthesize: dropping ${entry.role} asset (${entry.source}) — no description, and generate can't tell same-role Assets apart without one`,
+      );
+      continue;
+    }
     const candidate = byPath.get(entry.source);
     if (!candidate || !existsSync(candidate.absPath)) {
       log.warn(`synthesize: classified asset not found on disk: ${entry.source}`);
       continue;
+    }
+    if (SINGLETON_ASSET_ROLES.has(entry.role)) {
+      seenSingletons.add(entry.role);
     }
     let name = canonicalName(entry.role, extname(candidate.absPath).toLowerCase(), counters);
     while (usedNames.has(name)) {
@@ -156,7 +190,7 @@ export function reconcileAssets(input: {
       role: entry.role,
       file: `assets/${name}`,
       source: "captured",
-      alt: entry.alt,
+      description: entry.description,
       originalUrl: candidate.url,
     });
   }
@@ -169,7 +203,7 @@ export function reconcileAssets(input: {
         role: "logo",
         file: "assets/logo.svg",
         source: "fallback",
-        alt: `${clientName} logo`,
+        description: `${clientName} logo`,
       });
       log.step("synthesize: no logo captured — using Fallback Asset");
     }

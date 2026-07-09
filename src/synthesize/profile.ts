@@ -87,7 +87,8 @@ export const AssetManifestEntrySchema = z.object({
   /** Path relative to `context/` (e.g. `assets/logo.png`). */
   file: z.string(),
   source: z.enum(["captured", "fallback"]),
-  alt: z.string().optional(),
+  /** What the image depicts — read by the text-only `generate` stage, which never sees it. */
+  description: z.string().optional(),
   originalUrl: z.string().optional(),
 });
 export type AssetManifestEntry = z.infer<typeof AssetManifestEntrySchema>;

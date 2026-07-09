@@ -9,7 +9,7 @@ The failure that forced this: with the shipped opencode defaults, `assetClassifi
 **Every model-consuming call maps to one of four capability roles, on two axes (modality × intelligence):**
 
 - `classify` — **cheap vision**: asset classification **and the Design Brief** (the Brief opens the logo + existing-site screenshots, so it is *not* a text-only call — ADR-0010 mis-tiered it as plain `small`).
-- `code` — **text**: the Site build. It works entirely from the text Brief/Profile plus asset paths and alt text and never opens an image, so a strong, cheap text coder suffices — and it is the highest-token-volume call, where a cheap model saves the most.
+- `code` — **text**: the Site build. It works entirely from the text Brief/Profile plus asset paths and their classified descriptions and never opens an image, so a strong, cheap text coder suffices — and it is the highest-token-volume call, where a cheap model saves the most.
 - `reason` — **smart text**: profile synthesis, deep text research over the crawl.
 - `audit` — **smart vision**: the review inspects per-page screenshots for visual quality.
 

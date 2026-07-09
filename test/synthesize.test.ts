@@ -123,8 +123,8 @@ test("the Profile schema normalizes multi-valued model output to string | string
 
 test("renderAssetsSection lists each Asset, flagging fallbacks", () => {
   const section = renderAssetsSection([
-    { role: "logo", file: "assets/logo.svg", source: "fallback", alt: "Acme logo" },
-    { role: "hero", file: "assets/hero.png", source: "captured", alt: "Storefront" },
+    { role: "logo", file: "assets/logo.svg", source: "fallback", description: "Acme logo" },
+    { role: "hero", file: "assets/hero.png", source: "captured", description: "Storefront" },
   ]);
   expect(section).toContain("## Assets");
   expect(section).toContain(
@@ -207,7 +207,7 @@ test("reconcileAssets copies kept captured assets and skips a fallback when a lo
 
   const classification: AssetClassification = {
     assets: [
-      { source: logoPath, role: "logo", keep: true, alt: "Acme logo" },
+      { source: logoPath, role: "logo", keep: true, description: "Acme logo" },
       { source: heroPath, role: "hero", keep: true },
       { source: join(ingest, "a", "missing.png"), role: "photo", keep: true },
     ],
@@ -226,6 +226,62 @@ test("reconcileAssets copies kept captured assets and skips a fallback when a lo
   expect(manifest.some((a) => a.source === "fallback")).toBe(false); // a real logo was kept
   expect(existsSync(join(contextDir, "assets", "logo.png"))).toBe(true);
   expect(existsSync(join(contextDir, "assets", "hero.png"))).toBe(true);
+});
+
+test("reconcileAssets keeps only the first of a singleton role and drops the rest", () => {
+  const ingest = join(root, "ingest");
+  const contextDir = join(root, "context");
+  mkdirSync(join(ingest, "a"), { recursive: true });
+  const logoPath = join(ingest, "a", "logo.png");
+  const logo2Path = join(ingest, "a", "logo2.png");
+  writeFileSync(logoPath, PNG);
+  writeFileSync(logo2Path, PNG);
+
+  const classification: AssetClassification = {
+    assets: [
+      { source: logoPath, role: "logo", keep: true, description: "Acme logo" },
+      { source: logo2Path, role: "logo", keep: true, description: "Acme logo variant" },
+    ],
+  };
+  const manifest = reconcileAssets({
+    classification,
+    candidates: [{ absPath: logoPath }, { absPath: logo2Path }],
+    contextDir,
+    clientName: "Acme",
+    log,
+  });
+
+  expect(manifest.filter((a) => a.role === "logo")).toHaveLength(1);
+  expect(manifest.find((a) => a.role === "logo")?.file).toBe("assets/logo.png");
+  expect(existsSync(join(contextDir, "assets", "logo2.png"))).toBe(false);
+});
+
+test("reconcileAssets drops a multi-instance-role asset with no description, keeps a described one", () => {
+  const ingest = join(root, "ingest");
+  const contextDir = join(root, "context");
+  mkdirSync(join(ingest, "a"), { recursive: true });
+  const teamPath = join(ingest, "a", "team.png");
+  const team2Path = join(ingest, "a", "team2.png");
+  writeFileSync(teamPath, PNG);
+  writeFileSync(team2Path, PNG);
+
+  const classification: AssetClassification = {
+    assets: [
+      { source: teamPath, role: "team", keep: true },
+      { source: team2Path, role: "team", keep: true, description: "Two staff at the counter" },
+    ],
+  };
+  const manifest = reconcileAssets({
+    classification,
+    candidates: [{ absPath: teamPath }, { absPath: team2Path }],
+    contextDir,
+    clientName: "Acme",
+    log,
+  });
+
+  expect(manifest.filter((a) => a.role === "team")).toHaveLength(1);
+  expect(manifest.find((a) => a.role === "team")?.file).toBe("assets/team.png");
+  expect(existsSync(join(contextDir, "assets", "team.png"))).toBe(true);
 });
 
 test("reconcileAssets drops in the Fallback Asset logo when none is captured", () => {
@@ -311,7 +367,9 @@ test("runSynthesize classifies captured assets into the manifest (vision call)",
     manifest,
     log,
     engine: fakeStageEngine({
-      assetsJson: { assets: [{ source: logoAbs, role: "logo", keep: true, alt: "Acme logo" }] },
+      assetsJson: {
+        assets: [{ source: logoAbs, role: "logo", keep: true, description: "Acme logo" }],
+      },
     }),
   });
 

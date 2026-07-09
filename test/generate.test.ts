@@ -251,7 +251,7 @@ test("runGenerate stages every Profile Asset into src/assets/captured/ before th
   mkdirSync(join(paths.context, "assets"), { recursive: true });
   writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
   profile.assets = [
-    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+    { role: "logo", file: "assets/logo.png", source: "captured", description: "Tailored Co. logo" },
   ];
   const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
 
@@ -285,7 +285,7 @@ test("runGenerate warns (without failing) when a staged Asset is never reference
   mkdirSync(join(paths.context, "assets"), { recursive: true });
   writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
   profile.assets = [
-    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+    { role: "logo", file: "assets/logo.png", source: "captured", description: "Tailored Co. logo" },
   ];
   const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
 
@@ -310,7 +310,7 @@ test("runGenerate does not warn when the staged Asset was actually referenced in
   mkdirSync(join(paths.context, "assets"), { recursive: true });
   writeFileSync(join(paths.context, "assets", "logo.png"), FAKE_ASSET_BYTES);
   profile.assets = [
-    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+    { role: "logo", file: "assets/logo.png", source: "captured", description: "Tailored Co. logo" },
   ];
   const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
 
@@ -334,7 +334,7 @@ test("runGenerate skips a Profile Asset missing from context/ instead of throwin
   const { paths, profile } = await setupClientContext();
   // No file actually written under context/assets/ for this entry.
   profile.assets = [
-    { role: "logo", file: "assets/logo.png", source: "captured", alt: "Tailored Co. logo" },
+    { role: "logo", file: "assets/logo.png", source: "captured", description: "Tailored Co. logo" },
   ];
   const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
 
@@ -360,7 +360,7 @@ test("runGenerate swaps in a captured icon as the favicon, mechanically, with no
   mkdirSync(join(paths.context, "assets"), { recursive: true });
   writeFileSync(join(paths.context, "assets", "icon.png"), FAKE_ASSET_BYTES);
   profile.assets = [
-    { role: "icon", file: "assets/icon.png", source: "captured", alt: "Tailored Co. favicon" },
+    { role: "icon", file: "assets/icon.png", source: "captured", description: "Tailored Co. favicon" },
   ];
   const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
 

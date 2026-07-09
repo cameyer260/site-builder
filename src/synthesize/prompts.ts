@@ -1,6 +1,6 @@
 import type { IngestManifest } from "../ingest/manifest.ts";
 import type { AssetCandidate } from "./assets.ts";
-import { ASSET_ROLES } from "./assets.ts";
+import { ASSET_ROLES, SINGLETON_ASSET_ROLES } from "./assets.ts";
 import { renderChecklistForPrompt } from "./checklist.ts";
 
 /**
@@ -15,6 +15,8 @@ export function buildAssetPrompt(input: {
   candidates: AssetCandidate[];
 }): string {
   const list = input.candidates.map((c) => `- ${c.absPath}`).join("\n");
+  const multiRoles = ASSET_ROLES.filter((r) => !SINGLETON_ASSET_ROLES.has(r));
+  const singletonRoles = ASSET_ROLES.filter((r) => SINGLETON_ASSET_ROLES.has(r));
   return [
     "You are classifying the images captured from a business's existing website,",
     "to assemble the asset set for a new marketing site.",
@@ -27,10 +29,20 @@ export function buildAssetPrompt(input: {
     "site (a real logo, strong hero/photography, genuine product/team shots).",
     "Set `keep` to false for tracking pixels, tiny spacers, decorative icons,",
     "duplicates, or anything low-value or unreadable. Choose at most ONE logo.",
-    "Write a concise, descriptive `alt` for each kept image.",
+    "Write a `description` of what each kept image actually depicts (subject,",
+    "setting, notable details). A later stage decides where to use each image but",
+    "never sees the image itself — your description is its only way to tell two",
+    "images of the same role apart and pick the right one for each spot. This is",
+    "not HTML alt text (that gets written separately, later); write for a reader",
+    "choosing between images, not for a screen reader.",
+    `\`description\` is REQUIRED for every kept image whose role is ${multiRoles.map((r) => `\`${r}\``).join(", ")}`,
+    "— a kept image in one of those roles with no description is discarded",
+    `outright, so never leave it blank on something worth keeping. (${singletonRoles.map((r) => `\`${r}\``).join(", ")}`,
+    "are each capped at one kept image, so there's nothing to disambiguate — a",
+    "description there is a nice-to-have, not required.)",
     "",
     `Write your answer as JSON to the file ${input.contextDir}/assets.json with this shape:`,
-    '{ "assets": [ { "source": "<the exact absolute path above>", "role": "<role>", "keep": true|false, "alt": "<alt text>" } ] }',
+    '{ "assets": [ { "source": "<the exact absolute path above>", "role": "<role>", "keep": true|false, "description": "<what the image depicts>" } ] }',
     "",
     "Include one entry per file above, echoing its path verbatim in `source`.",
     "Write ONLY that file. Do not print anything else.",

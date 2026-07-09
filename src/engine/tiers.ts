@@ -22,8 +22,9 @@ export type Role = (typeof ROLES)[number];
  *   both open captured images (the logo, existing-site screenshots), so both
  *   need a multimodal model — the Brief is *not* a text-only call.
  * - `code` (**text**): the Site build works from the text Brief/Profile plus
- *   asset paths + alt text; it never opens an image, so a strong, cheap text
- *   coder is enough (and it's the highest-volume call — where cheap matters most).
+ *   asset paths and their classified descriptions; it never opens an image, so
+ *   a strong, cheap text coder is enough (and it's the highest-volume call —
+ *   where cheap matters most).
  * - `reason` (**text**): profile synthesis is deep text research over the crawl.
  * - `audit` (smart **vision**): the review inspects screenshots for visual quality.
  */

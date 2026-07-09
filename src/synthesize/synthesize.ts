@@ -184,8 +184,8 @@ export function renderAssetsSection(assets: AssetManifestEntry[]): string {
   ];
   for (const a of assets) {
     const tag = a.source === "fallback" ? " (fallback — no original found)" : "";
-    const alt = a.alt ? ` — ${a.alt}` : "";
-    lines.push(`- **${a.role}**${tag}: \`${a.file}\`${alt}`);
+    const description = a.description ? ` — ${a.description}` : "";
+    lines.push(`- **${a.role}**${tag}: \`${a.file}\`${description}`);
   }
   lines.push("");
   return lines.join("\n");

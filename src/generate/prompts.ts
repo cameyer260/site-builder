@@ -118,9 +118,9 @@ function renderAssetLines(assets: AssetManifestEntry[]): string[] {
     return ["   (none captured — rely on stock photography for step 4 below.)"];
   }
   return relevant.map((a) => {
-    const alt = a.alt ? ` (alt: "${a.alt}")` : "";
+    const description = a.description ? ` — depicts: ${a.description}` : "";
     const requirement = a.role === "logo" ? " — use this as the site's logo/brand mark" : "";
-    return `   - ${a.role} → ${capturedAssetPath(a.file)}${alt}${requirement}`;
+    return `   - ${a.role} → ${capturedAssetPath(a.file)}${description}${requirement}`;
   });
 }
 
