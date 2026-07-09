@@ -4,7 +4,7 @@ import type { Config } from "../config/schema.ts";
 import type { EngineKind } from "../engine/adapter.ts";
 import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
-import { STAGE_TIER } from "../engine/tiers.ts";
+import { resolveModel } from "../engine/tiers.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import { displayFieldValue, type Profile } from "../synthesize/profile.ts";
 import type { Logger } from "../util/log.ts";
@@ -47,12 +47,7 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
   const engineKind = params.engineKind ?? config.defaultEngine;
   const engineProfile = config.engines[engineKind];
   const engineBin = params.engineBin ?? engineProfile.bin;
-  const modelFor =
-    params.modelFor ??
-    ((stage: string) => {
-      const tier = STAGE_TIER[stage] ?? "best";
-      return engineProfile.models[tier];
-    });
+  const modelFor = params.modelFor ?? ((stage: string) => resolveModel(engineProfile, stage));
 
   const versionDir = paths.versionDir(version);
   const briefMdPath = join(artifactsDir(versionDir), "brief.md");
@@ -77,7 +72,8 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
     }),
     cwd: versionDir,
     addDirs: [paths.context, paths.ingest],
-    // Brief uses the small tier (`brief` key) — a sub-call of generate, not a stage.
+    // Brief is the `classify` role (cheap vision) — it opens the logo + existing-
+    // site screenshots — and is a sub-call of generate, not a stage of its own.
     model: modelFor("brief"),
     maxBudgetUsd: BRIEF_BUDGET_USD,
     timeoutMs: BRIEF_TIMEOUT_MS,

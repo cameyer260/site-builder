@@ -5,7 +5,7 @@ import type { Config } from "../config/schema.ts";
 import type { EngineKind } from "../engine/adapter.ts";
 import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
-import { STAGE_TIER } from "../engine/tiers.ts";
+import { resolveModel } from "../engine/tiers.ts";
 import { profilesFromConfig } from "../playwright/screenshot.ts";
 import type { Client } from "../storage/client.ts";
 import { ARTIFACTS_DIRNAME, type ClientPaths } from "../storage/layout.ts";
@@ -64,12 +64,7 @@ export async function runAudit(params: AuditParams): Promise<void> {
   const engineKind = params.engineKind ?? config.defaultEngine;
   const engineProfile = config.engines[engineKind];
   const engineBin = params.engineBin ?? engineProfile.bin;
-  const modelFor =
-    params.modelFor ??
-    ((stage: string) => {
-      const tier = STAGE_TIER[stage] ?? "best";
-      return engineProfile.models[tier];
-    });
+  const modelFor = params.modelFor ?? ((stage: string) => resolveModel(engineProfile, stage));
   const inspect = params.inspect ?? inspectBuiltSite;
   const lighthouse = params.lighthouse ?? runLighthouseScorecard;
 

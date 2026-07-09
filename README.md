@@ -365,19 +365,30 @@ it.
 | `root` | *(required, prompted)* | Where Client folders live. |
 | `defaultEngine` | `claudey` | Engine used when `--engine` is not passed. |
 | `engines.claudey.bin` | `claudey` | Binary for the claudey engine. |
-| `engines.claudey.models.best` | `claude-opus-4-8` | generate + audit + synthesize (best tier). |
-| `engines.claudey.models.small` | `claude-sonnet-5` | assetClassification + Design Brief (small tier). |
+| `engines.claudey.models.best` | `claude-opus-4-8` | Base best tier → `code` + `reason` + `audit` roles. |
+| `engines.claudey.models.small` | `claude-sonnet-5` | Base small tier → `classify` role (asset classification + Design Brief). |
 | `engines.codey.bin` | `codey` | Binary for the codey engine. |
-| `engines.codey.models.best` | `gpt-5.5` | generate + audit + synthesize. |
-| `engines.codey.models.small` | `gpt-5.4-mini` | assetClassification + Design Brief. |
+| `engines.codey.models.best` | `gpt-5.5` | Base best tier → `code` + `reason` + `audit`. |
+| `engines.codey.models.small` | `gpt-5.4-mini` | Base small tier → `classify`. |
 | `engines.opencode.bin` | `opencode` | Binary for the opencode engine. |
-| `engines.opencode.models.best` | `openrouter/deepseek/deepseek-v4-pro` | generate + audit + synthesize. |
-| `engines.opencode.models.small` | `openrouter/deepseek/deepseek-v4-flash` | assetClassification + Design Brief. |
+| `engines.opencode.models.best` | `openrouter/google/gemini-3-pro-preview` | Base best tier (vision) → `audit`. |
+| `engines.opencode.models.small` | `openrouter/google/gemini-3-flash-preview` | Base small tier (vision) → `classify`. |
+| `engines.opencode.modelRoles.code` | `openrouter/z-ai/glm-5.2` | `generate` build — cheap text coder (overrides best tier). |
+| `engines.opencode.modelRoles.reason` | `openrouter/deepseek/deepseek-v4-pro` | `synthesize` — cheap text (overrides best tier). |
 | `wranglerBin` | `wrangler` | Cloudflare deploy, and Cloudflare teardown for `sb remove`. |
 | `ghBin` | `gh` | For `--github` / `sb push`, and GitHub teardown for `sb remove`. |
 | `pexelsApiKey` | *(unset)* | Enables tier-2 stock imagery. |
 | `viewports.desktop` / `viewports.mobile` | `1440` / `390` | Screenshot Viewport Profiles. |
 | `pageCap` | `10` | Default crawl cap; override per run with `--pages`. |
+
+Models are chosen by **capability role** (ADR-0013): `classify` (cheap vision — asset
+classification + Design Brief), `code` (text — the Site build), `reason` (smart text —
+synthesis), and `audit` (smart vision — the review). Each role resolves to a per-role
+`modelRoles.<role>` override when set, else the role's base tier (`small` for `classify`,
+`best` for the rest). Multimodal engines (claudey/codey) leave `modelRoles` empty and
+just use the two tiers; opencode keeps vision models on the base tiers and overrides the
+text roles (`code`, `reason`) with cheaper text-only models over OpenRouter. Any role is
+settable per engine, e.g. `sb config set engines.opencode.modelRoles.audit <model>`.
 
 ---
 

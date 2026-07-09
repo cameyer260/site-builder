@@ -90,9 +90,14 @@ prepended to the prompt for codey and opencode), effort flag (claudey/codey
 `result` event + rate-limit watchdog;
 codey/opencode `--json`/`--format json` terminal event + non-zero exit). `runEngine`
 keeps all process lifecycle (spawn, process-group kill, timeout, drain) generic and
-never rejects. Models are a two-tier abstraction — `best` (generate/audit/synthesize) and
-`small` (asset classification / Design Brief derivation) — with a fixed stage→tier table in code and
-each Engine's concrete ids in `config.engines.<kind>.models`. The per-run selection
+never rejects. Models are chosen by **capability role** (ADR-0013): each call maps to
+one of `classify` (cheap vision — asset classification + Design Brief), `code` (text —
+the Site build), `reason` (smart text — profile synthesis), or `audit` (smart vision —
+the review). A fixed stage→role table in code (`engine/tiers.ts`) resolves against each
+Engine's two base tiers (`best`/`small`) plus optional per-role `modelRoles` overrides —
+so a multimodal engine (claudey/codey) just collapses to its two tiers, while opencode
+routes text calls to cheap text models over OpenRouter and keeps vision models on the
+vision roles. The per-run selection
 lives on `RunContext` (config holds only `defaultEngine` + per-engine reference data)
 and is **not** persisted across resume. Containment is delegated to each wrapper, so
 no permission flags are sent by default; `src/engine/stage.ts` scrubs a single

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
 import type { EngineRunner } from "../src/engine/runner.ts";
-import { STAGE_TIER } from "../src/engine/tiers.ts";
+import { resolveModel } from "../src/engine/tiers.ts";
 import { ARTIFACTS_DIRNAME } from "../src/generate/artifacts.ts";
 import { runVariant, smartBuild } from "../src/pipeline/orchestrator.ts";
 import type { RunContext } from "../src/pipeline/types.ts";
@@ -37,10 +37,7 @@ function makeCtx(name: string, opts: { engine?: EngineRunner } = {}): RunContext
     version: 1,
     engineKind,
     engineBin: engineProfile.bin,
-    modelFor: (stage) => {
-      const tier = STAGE_TIER[stage] ?? "best";
-      return engineProfile.models[tier];
-    },
+    modelFor: (stage) => resolveModel(engineProfile, stage),
     log: createLogger({ quiet: true }),
     inputs: INPUTS,
     engine: opts.engine ?? fakeStageEngine(),

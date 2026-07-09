@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "./config/schema.ts";
 import type { EngineKind } from "./engine/adapter.ts";
-import { STAGE_TIER } from "./engine/tiers.ts";
+import { resolveModel } from "./engine/tiers.ts";
 import type { RunContext } from "./pipeline/types.ts";
 import type { ClientInputs } from "./storage/client.ts";
 import { clientPaths } from "./storage/layout.ts";
@@ -29,10 +29,7 @@ export function buildRunContext(opts: {
   const engineKind: EngineKind = opts.engine ?? opts.config.defaultEngine;
   const engineProfile = opts.config.engines[engineKind];
   const engineBin = engineProfile.bin;
-  const modelFor = (stage: string): string => {
-    const tier = STAGE_TIER[stage] ?? "best";
-    return engineProfile.models[tier];
-  };
+  const modelFor = (stage: string): string => resolveModel(engineProfile, stage);
 
   const paths = clientPaths(opts.config.root, opts.name);
   mkdirSync(paths.dir, { recursive: true });

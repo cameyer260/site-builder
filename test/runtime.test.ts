@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULTS } from "../src/config/schema.ts";
-import { STAGE_TIER } from "../src/engine/tiers.ts";
+import { STAGE_ROLE } from "../src/engine/tiers.ts";
 import { buildRunContext } from "../src/runtime.ts";
 
 let root: string;
@@ -92,10 +92,28 @@ test("modelFor falls back to best tier for unknown stage names", () => {
   expect(ctx.modelFor("")).toBe(best);
 });
 
-test("STAGE_TIER maps the known stages to the right tiers", () => {
-  expect(STAGE_TIER.generate).toBe("best");
-  expect(STAGE_TIER.audit).toBe("best");
-  expect(STAGE_TIER.synthesize).toBe("best");
-  expect(STAGE_TIER.assetClassification).toBe("small");
-  expect(STAGE_TIER.brief).toBe("small");
+test("STAGE_ROLE maps the known stages to the right capability roles", () => {
+  expect(STAGE_ROLE.generate).toBe("code");
+  expect(STAGE_ROLE.synthesize).toBe("reason");
+  expect(STAGE_ROLE.audit).toBe("audit");
+  expect(STAGE_ROLE.assetClassification).toBe("classify");
+  expect(STAGE_ROLE.brief).toBe("classify");
+});
+
+test("modelFor routes opencode per capability role (text vs vision + cost)", () => {
+  const ctx = buildRunContext({
+    config: makeConfig(),
+    name: "Acme",
+    version: 1,
+    command: "build",
+    engine: "opencode",
+  });
+  const oc = DEFAULTS.engines.opencode;
+  // text roles → the cheap text overrides
+  expect(ctx.modelFor("generate")).toBe(oc.modelRoles.code as string);
+  expect(ctx.modelFor("synthesize")).toBe(oc.modelRoles.reason as string);
+  // vision roles → the multimodal base tiers (no override set)
+  expect(ctx.modelFor("assetClassification")).toBe(oc.models.small);
+  expect(ctx.modelFor("brief")).toBe(oc.models.small);
+  expect(ctx.modelFor("audit")).toBe(oc.models.best);
 });

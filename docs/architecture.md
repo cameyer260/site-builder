@@ -86,8 +86,11 @@ auth.
 - `runEngine` (`runner.ts`) spawns the wrapper, feeds the prompt on **stdin**
   (never as a positional), parses `stream-json`, and returns a success/failure
   verdict — it **never rejects**, so a stage decides what to do with a failure.
-- Model is chosen **per stage** from `config.models`: Opus for generate/audit/synthesize,
-  Sonnet for asset classification / Design Brief derivation.
+- Model is chosen **per capability role** (ADR-0013): `classify` (cheap vision — asset
+  classification + Design Brief), `code` (text — Site build), `reason` (smart text —
+  synthesis), `audit` (smart vision — review). Multimodal engines collapse these onto
+  two tiers (e.g. Opus for code/reason/audit, Sonnet for classify); opencode overrides
+  the text roles with cheap text models via `config.engines.opencode.modelRoles`.
 - Containment is delegated to `claudey` (a bypass-permissions container scoped to
   its mounts), so the tool sends **no permission flags** by default. The blast
   radius is the container mount scope.

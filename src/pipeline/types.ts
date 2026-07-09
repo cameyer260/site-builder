@@ -37,7 +37,8 @@ export interface RunContext {
   engineBin: string;
   /**
    * Returns the model id for a given stage name, resolved via the fixed
-   * STAGE_TIER table and the active engine's model pair (ADR-0010).
+   * stage→capability-role table and the active engine's models + per-role
+   * overrides (ADR-0013, revising ADR-0010). See `engine/tiers.ts`.
    */
   modelFor: (stage: string) => string;
 

@@ -132,14 +132,17 @@ async function interactiveSetup(): Promise<number> {
       claudey: {
         bin: claudeyBin.trim() || DEFAULTS.engines.claudey.bin,
         models: existing?.engines.claudey.models ?? DEFAULTS.engines.claudey.models,
+        modelRoles: existing?.engines.claudey.modelRoles ?? DEFAULTS.engines.claudey.modelRoles,
       },
       codey: {
         bin: codeyBin.trim() || DEFAULTS.engines.codey.bin,
         models: existing?.engines.codey.models ?? DEFAULTS.engines.codey.models,
+        modelRoles: existing?.engines.codey.modelRoles ?? DEFAULTS.engines.codey.modelRoles,
       },
       opencode: {
         bin: opencodeBin.trim() || DEFAULTS.engines.opencode.bin,
         models: existing?.engines.opencode.models ?? DEFAULTS.engines.opencode.models,
+        modelRoles: existing?.engines.opencode.modelRoles ?? DEFAULTS.engines.opencode.modelRoles,
       },
     },
     wranglerBin: wranglerBin.trim() || DEFAULTS.wranglerBin,

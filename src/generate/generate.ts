@@ -5,7 +5,7 @@ import type { Config } from "../config/schema.ts";
 import type { EngineKind } from "../engine/adapter.ts";
 import { type EngineRunner, runEngine } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
-import { STAGE_TIER } from "../engine/tiers.ts";
+import { resolveModel } from "../engine/tiers.ts";
 import type { Client } from "../storage/client.ts";
 import { type ClientPaths, isVersionBuilt, versionMarkerPath } from "../storage/layout.ts";
 import type { Profile } from "../synthesize/profile.ts";
@@ -73,12 +73,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
   const engineKind = params.engineKind ?? config.defaultEngine;
   const engineProfile = config.engines[engineKind];
   const engineBin = params.engineBin ?? engineProfile.bin;
-  const modelFor =
-    params.modelFor ??
-    ((stage: string) => {
-      const tier = STAGE_TIER[stage] ?? "best";
-      return engineProfile.models[tier];
-    });
+  const modelFor = params.modelFor ?? ((stage: string) => resolveModel(engineProfile, stage));
 
   const versionDir = params.paths.versionDir(version);
 
