@@ -25,6 +25,12 @@ const ok = (): EngineResult => ({
 export interface FakeStageEngineOptions {
   /** Payload written to `assets.json` for the classification call. */
   assetsJson?: unknown;
+  /**
+   * Return a non-ok result for the classification call while still writing
+   * `assetsJson` — simulates an engine (e.g. opencode) that completes the
+   * classification but reports a spurious non-zero exit.
+   */
+  failClassification?: boolean;
   /** Payload written to `profile.json` for the profile call. */
   profileJson?: unknown;
   /** Contents written to `profile.md`. */
@@ -90,6 +96,16 @@ export function fakeStageEngine(options: FakeStageEngineOptions = {}): EngineRun
         join(opts.cwd, "assets.json"),
         JSON.stringify(options.assetsJson ?? { assets: [] }),
       );
+      if (options.failClassification) {
+        return {
+          ok: false,
+          resultText: null,
+          isError: true,
+          exitCode: 1,
+          events: [],
+          error: "forced classification failure",
+        };
+      }
       return ok();
     }
     if (opts.prompt.includes("profile.json")) {

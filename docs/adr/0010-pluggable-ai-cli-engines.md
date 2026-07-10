@@ -26,6 +26,6 @@ The `EngineRunner` seam signature is preserved byte-for-byte (`(engineBin, opts)
 ## Consequences
 
 - **claudey is the design-quality default** and the only Engine with a rate-limit-stall watchdog (it is the only one that emits a parseable throttle event; ADR-0001). codey/opencode have no parseable rate-limit signal — they stall silently or fail, so they rely on the stage `timeoutMs` alone.
-- Verdict trust on codey/opencode leans on **exit code + terminal event**, which is safe because the stages already re-gate on real artifacts (`astro build`, valid `profile.json`), so a missed parsing nuance cannot pass a broken Site.
+- Verdict trust on codey/opencode leans on **exit code + terminal event**, which is safe because the stages already re-gate on real artifacts (`astro build`, valid `profile.json`), so a missed parsing nuance cannot pass a broken Site. Best-effort AI calls must genuinely honor this too, not just the hard-gated ones — ADR-0014 fixes a case (asset classification) where the code still trusted the engine's own `ok` verdict over the artifact it wrote, and a real opencode bug turned that gap into recurring lost Assets.
 - Design intelligence requires the `ui-ux-pro-max` skill in **whichever harness the selected Engine runs in** (see ADR-0006), not just Claude Code.
 - Engine selection is **not persisted**; a `resume` with no `--engine` uses `defaultEngine`, which is correct because stages are engine-agnostic at their on-disk boundaries.

@@ -85,11 +85,21 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
       timeoutMs: CALL_TIMEOUT_MS,
       log,
     });
+    // Asset classification is best-effort and re-gates on the artifact, not the
+    // engine's own verdict: some engines (e.g. opencode) can write a fully valid
+    // assets.json and still report a non-zero exit — a stdout-mirroring race in
+    // the CLI's event loop, unrelated to whether the classification succeeded.
+    // Trusting a schema-valid file over a flaky exit code is what saves the
+    // captured Assets in that case; only fall back when nothing usable landed.
     const parsed = readClassification(contextDir);
-    if (result.ok && parsed) {
+    if (parsed) {
       classification = parsed;
+      if (!result.ok) {
+        log.warn(
+          `synthesize: asset classification engine reported an error but wrote a valid assets.json (${engineFailureReason(result)}); using it anyway`,
+        );
+      }
     } else {
-      // Asset classification is best-effort: a failure falls back to logo-only.
       log.warn(
         `synthesize: asset classification unavailable (${result.ok ? "no valid assets.json" : engineFailureReason(result)}); using fallbacks`,
       );

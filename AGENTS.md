@@ -90,7 +90,12 @@ prepended to the prompt for codey and opencode), effort flag (claudey/codey
 `result` event + rate-limit watchdog;
 codey/opencode `--json`/`--format json` terminal event + non-zero exit). `runEngine`
 keeps all process lifecycle (spawn, process-group kill, timeout, drain) generic and
-never rejects. Models are chosen by **capability role** (ADR-0013): each call maps to
+never rejects; every in-flight call also registers with `killActiveEngines`, which
+`bin/sb.ts`'s SIGINT/SIGTERM handler drains on Ctrl-C so a cancelled build can't
+orphan a still-running engine (ADR-0014). A best-effort AI call (e.g. asset
+classification) should re-gate on the artifact it wrote, not the engine's own `ok`
+verdict — ADR-0014, after a real engine bug reported `ok: false` for a call that had
+actually succeeded. Models are chosen by **capability role** (ADR-0013): each call maps to
 one of `classify` (cheap vision — asset classification + Design Brief), `code` (text —
 the Site build), `reason` (smart text — profile synthesis), or `audit` (smart vision —
 the review). A fixed stage→role table in code (`engine/tiers.ts`) resolves against each

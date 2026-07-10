@@ -413,7 +413,18 @@ matters if you use `--github` / `sb push`. Install `gh` and run `gh auth login`.
 **A run stopped partway (rate limit, crash, Ctrl-C).** Nothing is lost — state is
 on disk. `sb status <client>` shows the failed stage; `sb resume <client>`
 continues from it. A bare `sb build <client>` also continues an incomplete latest
-version.
+version. Ctrl-C also terminates the in-flight engine subprocess rather than
+leaving it running in the background.
+
+**`! synthesize: asset classification unavailable … using fallbacks` (or a
+warning that it's using a valid `assets.json` "anyway").** Usually a real engine
+failure, but sometimes a false alarm from a CLI-level bug (seen on `opencode`:
+an `EPIPE`/broken-pipe crash unrelated to whether classification actually
+succeeded — see [ADR-0014](docs/adr/0014-classification-regates-on-artifact.md)).
+`sb` trusts a valid, on-disk `assets.json` over the engine's own exit code, so
+the Client's captured Assets are used whenever classification actually wrote
+one — check `context/assets.json` for the Client if you're unsure whether real
+Assets made it into the Profile.
 
 **`astro build` failed during generate/audit.** That's the one hard gate
 ([ADR-0007](docs/adr/0007-lighthouse-as-evidence-not-gate.md)) — the stage fails

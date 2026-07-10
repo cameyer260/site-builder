@@ -101,12 +101,12 @@ test("interpretResult: no result event is a failure", () => {
   expect(r.error).toContain("no result event");
 });
 
-test("engineFailureReason: appends the stderr tail when the engine only printed there", () => {
+test("engineFailureReason: appends the stderr excerpt when the engine only printed there", () => {
   // The real failure mode: no result event, exit 1, the cause on stderr only.
   const r = interpretResult({
     events: [],
     exitCode: 1,
-    stderrTail: "Error: Input must be provided either through stdin or as a prompt argument\n",
+    stderrExcerpt: "Error: Input must be provided either through stdin or as a prompt argument\n",
   });
   const reason = engineFailureReason(r);
   expect(reason).toContain("engine exited 1 with no result event");
@@ -114,7 +114,7 @@ test("engineFailureReason: appends the stderr tail when the engine only printed 
 });
 
 test("engineFailureReason: omits the stderr clause when stderr is empty", () => {
-  const r = interpretResult({ events: [], exitCode: 1, stderrTail: "  " });
+  const r = interpretResult({ events: [], exitCode: 1, stderrExcerpt: "  " });
   expect(engineFailureReason(r)).toBe("engine exited 1 with no result event");
 });
 
@@ -169,6 +169,13 @@ test("runEngine: missing binary resolves to a failure (never throws)", async () 
   const result = await runEngine(join(dir, "does-not-exist"), { prompt: "x", cwd: dir });
   expect(result.ok).toBe(false);
   expect(result.error).toContain("not found");
+}, 20_000);
+
+test("runEngine: a repeating stderr error keeps the causal first line, not just the last repeat", async () => {
+  const result = await runEngine(FAKE_ENGINE, { prompt: "STDERR_SPAM", cwd: dir });
+  expect(result.ok).toBe(false);
+  // A tail-only window would have this pushed out by the trailing spam.
+  expect(engineFailureReason(result)).toContain("FATAL: root cause line");
 }, 20_000);
 
 test("runEngine: a rate-limit stall is abandoned after the grace window, not the timeout", async () => {

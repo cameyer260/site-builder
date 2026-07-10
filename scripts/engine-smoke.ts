@@ -80,8 +80,8 @@ log.info(`exit code: ${result.exitCode}`);
 if (result.error) {
   log.error(`error: ${result.error}`);
 }
-if (result.stderrTail) {
-  log.info(`stderr tail: ${result.stderrTail.slice(-400)}`);
+if (result.stderrExcerpt) {
+  log.info(`stderr excerpt: ${result.stderrExcerpt}`);
 }
 if (result.resultText) {
   log.info(`result text: ${result.resultText.slice(0, 500)}`);

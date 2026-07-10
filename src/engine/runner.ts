@@ -107,8 +107,15 @@ export interface EngineResult {
   events: StreamEvent[];
   /** Failure reason for non-ok results (spawn error, no result, etc.). */
   error?: string;
-  /** Tail of stderr, for diagnostics. */
-  stderrTail?: string;
+  /**
+   * Bounded excerpt of stderr, for diagnostics: the start and end of what the
+   * engine printed, elided in the middle when it's long. Keeping both ends
+   * (not just a tail) matters when the failure is a repeating error (e.g. an
+   * engine writing to an already-broken pipe on every attempt) — a tail-only
+   * window fills up with copies of the *last* repeat and loses the first,
+   * usually-causal, line.
+   */
+  stderrExcerpt?: string;
 }
 
 /**
@@ -158,7 +165,7 @@ export function interpretResult(input: {
   events: StreamEvent[];
   exitCode: number | null;
   spawnError?: string;
-  stderrTail?: string;
+  stderrExcerpt?: string;
 }): EngineResult {
   return ADAPTERS.claudey.interpretResult(input);
 }
@@ -172,6 +179,59 @@ const KILL_GRACE_MS = 5_000;
  */
 const EXIT_DRAIN_MS = 2_000;
 
+/** How much of stderr's start and end are kept for the diagnostic excerpt. */
+const STDERR_EXCERPT_CAP = 2_000;
+
+/**
+ * Composes the stderr excerpt from a bounded head and a rolling tail: when the
+ * whole stream fit in the tail's window, it already holds everything, so it's
+ * returned as-is; otherwise the head (likely the causal first line) and tail
+ * (the final state) are shown with an elision marker for what's in between.
+ */
+function composeStderrExcerpt(head: string, tail: string, totalLen: number): string {
+  if (totalLen <= STDERR_EXCERPT_CAP) {
+    return tail;
+  }
+  const omitted = totalLen - head.length - tail.length;
+  return omitted > 0 ? `${head}\n…[${omitted} more chars]…\n${tail}` : `${head}${tail}`;
+}
+
+interface ActiveEngine {
+  terminate: (reason: string) => void;
+  settled: Promise<void>;
+}
+
+/**
+ * Every in-flight `runEngine` call, so a top-level signal handler can reap them
+ * on shutdown. Each engine is spawned `detached: true` in its own process group
+ * so `killTree` can reach the whole tree (ADR-0001) — but that same detachment
+ * means the terminal's own Ctrl+C (SIGINT) is delivered to sb's process group
+ * only, never to the engine's. Without this registry, cancelling `sb build`
+ * orphans the engine, which keeps running standalone (observed with opencode
+ * spinning on EPIPE against its now-closed stdout pipe after such a cancel).
+ */
+const activeEngines = new Set<ActiveEngine>();
+
+/**
+ * Signals every in-flight engine's process tree to terminate — the same
+ * SIGTERM-then-SIGKILL escalation `runEngine` already uses for timeouts — and
+ * waits for each to actually exit, bounded so a hung engine can't block sb's
+ * own shutdown forever. Called from bin/sb.ts's SIGINT/SIGTERM handler.
+ */
+export async function killActiveEngines(reason: string): Promise<void> {
+  const entries = [...activeEngines];
+  if (entries.length === 0) {
+    return;
+  }
+  for (const entry of entries) {
+    entry.terminate(reason);
+  }
+  await Promise.race([
+    Promise.all(entries.map((entry) => entry.settled)),
+    new Promise<void>((resolve) => setTimeout(resolve, KILL_GRACE_MS + 1_000)),
+  ]);
+}
+
 /**
  * Spawns the engine, streams events (teeing a trace to the logger), delivers
  * the prompt per-adapter, and resolves with a parsed success/failure verdict.
@@ -182,7 +242,9 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
   const { args, stdin } = adapter.buildInvocation(opts);
   const events: StreamEvent[] = [];
   let stdoutBuffer = "";
+  let stderrHead = "";
   let stderrTail = "";
+  let stderrTotal = 0;
   let spawnError: string | undefined;
   let killReason: string | undefined;
 
@@ -238,6 +300,15 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
       escalationTimer = setTimeout(() => killTree("SIGKILL"), KILL_GRACE_MS);
     };
 
+    let markSettled = (): void => {};
+    const activeEntry: ActiveEngine = {
+      terminate,
+      settled: new Promise<void>((resolve) => {
+        markSettled = resolve;
+      }),
+    };
+    activeEngines.add(activeEntry);
+
     const timer =
       opts.timeoutMs !== undefined
         ? setTimeout(() => terminate(`engine timed out after ${opts.timeoutMs}ms`), opts.timeoutMs)
@@ -278,11 +349,14 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
           clearTimeout(t);
         }
       }
+      activeEngines.delete(activeEntry);
+      markSettled();
       ingestLine(stdoutBuffer);
       if (killReason && !spawnError) {
         spawnError = killReason;
       }
-      resolve(adapter.interpretResult({ events, exitCode: code, spawnError, stderrTail }));
+      const stderrExcerpt = composeStderrExcerpt(stderrHead, stderrTail, stderrTotal);
+      resolve(adapter.interpretResult({ events, exitCode: code, spawnError, stderrExcerpt }));
     };
 
     const ingestLine = (line: string): void => {
@@ -338,7 +412,11 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {
       bumpRateLimitWatchdog();
-      stderrTail = (stderrTail + chunk).slice(-2000);
+      stderrTotal += chunk.length;
+      if (stderrHead.length < STDERR_EXCERPT_CAP) {
+        stderrHead += chunk;
+      }
+      stderrTail = (stderrTail + chunk).slice(-STDERR_EXCERPT_CAP);
     });
 
     // `exit` fires the moment the direct child dies; `close` waits for every
@@ -369,15 +447,17 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
 
 /**
  * A human-facing failure reason for a non-ok engine run: the interpreted error
- * plus a compact tail of the child's stderr when present. Stage failures route
- * through this so a crash the engine printed only to stderr — never to the
- * stream-json result event (e.g. a `claudey` wrapper not forwarding stdin, or an
- * auth error) — is surfaced instead of silently dropped. See ADR-0001.
+ * plus the stderr excerpt when present. Stage failures route through this so a
+ * crash the engine printed only to stderr — never to the stream-json result
+ * event (e.g. a `claudey` wrapper not forwarding stdin, or an auth error) — is
+ * surfaced instead of silently dropped. See ADR-0001. Doesn't re-truncate the
+ * excerpt: `composeStderrExcerpt` already bounded it, and slicing from the end
+ * again would cut off exactly the causal first line it was built to keep.
  */
 export function engineFailureReason(result: EngineResult): string {
   const reason = result.error ?? "engine failed with no result";
-  const tail = result.stderrTail?.trim();
-  return tail ? `${reason} (stderr: ${tail.slice(-800)})` : reason;
+  const excerpt = result.stderrExcerpt?.trim();
+  return excerpt ? `${reason} (stderr: ${excerpt})` : reason;
 }
 
 /**

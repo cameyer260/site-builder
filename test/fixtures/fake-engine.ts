@@ -33,6 +33,15 @@ if (prompt.includes("BENIGN_STALL")) {
     rate_limit_info: { status: "rejected", rateLimitType: "five_hour" },
   });
   await new Promise(() => {});
+} else if (prompt.includes("STDERR_SPAM")) {
+  // Simulates a repeating-error crash (e.g. an engine writing to an
+  // already-broken stdout pipe on every attempt): the causal first line is
+  // followed by thousands of chars of a repeated, less useful message.
+  process.stderr.write("FATAL: root cause line\n");
+  for (let i = 0; i < 500; i++) {
+    process.stderr.write(`repeated spam line ${i}\n`);
+  }
+  process.exit(1);
 } else if (prompt.includes("FAIL")) {
   emit({
     type: "result",

@@ -14,7 +14,7 @@ export interface EngineAdapter {
     events: StreamEvent[];
     exitCode: number | null;
     spawnError?: string;
-    stderrTail?: string;
+    stderrExcerpt?: string;
   }): EngineResult;
   watchesRateLimit: boolean;
 }
@@ -64,8 +64,8 @@ const claudeyAdapter: EngineAdapter = {
     return { args, stdin: opts.prompt };
   },
 
-  interpretResult({ events, exitCode, spawnError, stderrTail }) {
-    const base = { events, exitCode, stderrTail, resultText: null, isError: true } as const;
+  interpretResult({ events, exitCode, spawnError, stderrExcerpt }) {
+    const base = { events, exitCode, stderrExcerpt, resultText: null, isError: true } as const;
     if (spawnError) {
       return { ...base, ok: false, error: spawnError };
     }
@@ -98,7 +98,7 @@ const claudeyAdapter: EngineAdapter = {
       usage: resultEvent.usage,
       exitCode,
       events,
-      stderrTail,
+      stderrExcerpt,
       error: ok
         ? undefined
         : resultEvent.subtype && resultEvent.subtype !== "success"
@@ -143,8 +143,8 @@ const codeyAdapter: EngineAdapter = {
     return { args }; // prompt is positional; no stdin
   },
 
-  interpretResult({ events, exitCode, spawnError, stderrTail }) {
-    const base = { events, exitCode, stderrTail, resultText: null, isError: true } as const;
+  interpretResult({ events, exitCode, spawnError, stderrExcerpt }) {
+    const base = { events, exitCode, stderrExcerpt, resultText: null, isError: true } as const;
     if (spawnError) {
       return { ...base, ok: false, error: spawnError };
     }
@@ -177,7 +177,7 @@ const codeyAdapter: EngineAdapter = {
       usage: turnCompleted.usage,
       exitCode,
       events,
-      stderrTail,
+      stderrExcerpt,
     };
   },
 
@@ -232,8 +232,8 @@ const opencodeAdapter: EngineAdapter = {
     return { args }; // prompt is positional; no stdin
   },
 
-  interpretResult({ events, exitCode, spawnError, stderrTail }) {
-    const base = { events, exitCode, stderrTail, resultText: null, isError: true } as const;
+  interpretResult({ events, exitCode, spawnError, stderrExcerpt }) {
+    const base = { events, exitCode, stderrExcerpt, resultText: null, isError: true } as const;
     if (spawnError) {
       return { ...base, ok: false, error: spawnError };
     }
@@ -259,7 +259,7 @@ const opencodeAdapter: EngineAdapter = {
       isError: false,
       exitCode,
       events,
-      stderrTail,
+      stderrExcerpt,
     };
   },
 

@@ -387,6 +387,52 @@ test("runSynthesize classifies captured assets into the manifest (vision call)",
   expect(profileMd).toContain("**logo**: `assets/logo.png` — Acme logo");
 });
 
+test("runSynthesize trusts a valid assets.json even when the classification call reports a non-ok result", async () => {
+  const paths = clientPaths(root, "Acme Plumbing");
+  const logoAbs = join(paths.ingest, "site/assets/logo.png");
+  mkdirSync(join(paths.ingest, "site/assets"), { recursive: true });
+  writeFileSync(logoAbs, PNG);
+  const client = newClient("Acme Plumbing", { docs: [], images: [], notes: "n" });
+
+  const manifest = emptyManifest({
+    site: {
+      baseUrl: "http://x",
+      pageCap: 10,
+      discovery: "single",
+      pages: [],
+      assets: [
+        {
+          url: "http://x/logo.png",
+          localPath: "site/assets/logo.png",
+          kind: "img",
+          fromPage: "http://x",
+          bytes: PNG.length,
+        },
+      ],
+    },
+  });
+
+  const profile = await runSynthesize({
+    paths,
+    config,
+    client,
+    manifest,
+    log,
+    engine: fakeStageEngine({
+      assetsJson: {
+        assets: [{ source: logoAbs, role: "logo", keep: true, description: "Acme logo" }],
+      },
+      failClassification: true,
+    }),
+  });
+
+  // the captured logo is used despite the engine reporting failure — not the fallback
+  const logo = profile.assets.find((a) => a.role === "logo");
+  expect(logo?.source).toBe("captured");
+  expect(logo?.file).toBe("assets/logo.png");
+  expect(existsSync(join(paths.context, "assets", "logo.png"))).toBe(true);
+});
+
 async function expectSynthesizeError(
   engine: ReturnType<typeof fakeStageEngine>,
   pattern: RegExp,
