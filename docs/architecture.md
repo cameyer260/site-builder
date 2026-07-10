@@ -16,14 +16,15 @@ bin/sb.ts
                  └─ src/pipeline/stages/*     thin adapters
                       └─ domain modules:      where the real work lives
                          src/ingest/  src/synthesize/  src/generate/
-                         src/audit/   src/deploy/
+                         src/audit/   src/deploy/       src/remove/
 ```
 
 **Keep logic in the right layer.** A `commands/*` file parses flags and builds a
 `RunContext`. The orchestrator owns the run loop and state transitions. A
 `stages/*` file stays *thin* — read inputs off disk, delegate to its domain
 module, declare its `outputs()`. Business logic lives in the domain modules, not
-the stage adapters.
+the stage adapters — idiomatic functional TypeScript over an OO/SOLID layering
+(ADR-0009).
 
 Runtime is **Bun**. TypeScript executes directly (no build step); intra-repo
 imports use explicit `.ts` extensions. Strict tsconfig
@@ -77,25 +78,42 @@ A **refresh** forks a *new* Site Version (re-run Context from `ingest`, then a n
 `vN+1`); **continue** resumes the latest version in place (its git history holds
 the increments). The reasoning is in ADR-0008.
 
-## The engine (`src/engine/`, ADR-0001)
+## The engine (`src/engine/`, ADR-0001/ADR-0010)
 
-AI stages shell out to the `claudey` wrapper (`claude -p` in a container) — *not*
-the Agent SDK and *not* a metered API key — to ride the developer's subscription
-auth.
+AI stages shell out to a headless coding-agent CLI — *not* the Agent SDK and
+*not* a metered API key — to ride the developer's subscription auth. Three
+interchangeable Engines are supported, selected per run with `--engine`:
+**claudey** (default; `claude -p` in a container), **codey** (a Codex/`codex
+exec` wrapper), and **opencode**.
 
-- `runEngine` (`runner.ts`) spawns the wrapper, feeds the prompt on **stdin**
-  (never as a positional), parses `stream-json`, and returns a success/failure
-  verdict — it **never rejects**, so a stage decides what to do with a failure.
-- Model is chosen **per capability role** (ADR-0013): `classify` (cheap vision — asset
-  classification + Design Brief), `code` (text — Site build), `reason` (smart text —
-  synthesis), `audit` (smart vision — review). Multimodal engines collapse these onto
-  two tiers (e.g. Opus for code/reason/audit, Sonnet for classify); opencode overrides
-  the text roles with cheap text models via `config.engines.opencode.modelRoles`.
-- Containment is delegated to `claudey` (a bypass-permissions container scoped to
-  its mounts), so the tool sends **no permission flags** by default. The blast
-  radius is the container mount scope.
-- `stage.ts` scrubs nested-Claude env markers so a `claude -p` run launched from
-  inside Claude Code behaves.
+- `runEngine` (`runner.ts`) is Engine-agnostic: it spawns the resolved binary,
+  parses its stream of events, and returns a success/failure verdict — it
+  **never rejects**, so a stage decides what to do with a failure.
+- `src/engine/adapter.ts` isolates everything that varies per CLI behind an
+  `EngineAdapter` (`ADAPTERS[kind]` for `"claudey" | "codey" | "opencode"`):
+  invocation dialect (claudey feeds the prompt on **stdin**; codey/opencode
+  take it positional), system-prompt handling (claudey:
+  `--append-system-prompt`; codey/opencode: prepended to the prompt, since
+  neither has a per-call flag), and verdict parsing (claudey: a `stream-json`
+  `result` event; codey/opencode: a terminal `turn.failed`/`error` event
+  backstopped by exit code). claudey is the only Engine with a parseable
+  rate-limit signal, so it alone gets the timeout/backoff watchdog.
+- Model is chosen **per capability role** (`src/engine/tiers.ts`, ADR-0013):
+  `classify` (cheap vision — asset classification + Design Brief), `code`
+  (text — Site build), `reason` (smart text — synthesis), `audit` (smart
+  vision — review). Multimodal engines (claudey/codey) collapse these onto
+  two base tiers (`best`/`small`); opencode overrides the text roles with
+  cheap text models via `config.engines.opencode.modelRoles`.
+- Containment is delegated to `claudey` (a bypass-permissions container scoped
+  to its mounts), so the tool sends **no permission flags** by default for
+  that Engine. The blast radius is the container mount scope.
+- `stage.ts` scrubs nested-agent env markers (the union of all three CLIs'
+  "I am running" vars) before every engine spawn, so a stage launched from
+  inside an agent session of any of the three CLIs behaves as a standalone
+  invocation.
+- Engine selection is **not persisted** — it lives on `RunContext`
+  (`engineKind`/`engineBin`), not `config.json` or `state.json`, so a `resume`
+  with no `--engine` falls back to `config.defaultEngine`.
 
 ## Storage & state (`src/storage/`, ADR-0003)
 
@@ -132,18 +150,20 @@ Each is a thin adapter over a domain module:
   extraction (`unpdf`/`mammoth`/txt/md), and `--notes`, normalized into `ingest/`.
   Pure code.
 - **`synthesize`** (`src/synthesize/`) — engine call A classifies + renames image
-  Assets (vision, Sonnet); engine call B writes the Client Profile (`profile.md` +
-  `profile.json` field statuses) and a "what we still need to know" Checklist.
+  Assets (`classify` role — cheap vision, ADR-0014's artifact-trust); engine call B
+  writes the Client Profile (`profile.md` + `profile.json` field statuses) and a
+  "what we still need to know" Checklist (`reason` role).
 - **`generate`** (`src/generate/`, ADR-0005/0006) — copies the [Kit](kit.md) into
   `sites/vN/`, stages every Profile Asset into `src/assets/captured/`
-  (`assets.ts` — which Assets to keep was already decided in `synthesize`, so
-  code moves the bytes and the build prompt only points at the result), `git
+  (`assets.ts`, ADR-0011 — which Assets to keep was already decided in
+  `synthesize`, so code moves the bytes and the build prompt only points at
+  the result, rather than trusting the Engine to copy them itself), `git
   init`s it, derives the Design Brief (`.site-builder/brief.md`, brand-color
   extraction, `--vibe`/`--style`), has the engine build on top invoking the
-  `ui-ux-pro-max` skill, sources imagery (`pexels.ts` three-tier rule, slots
-  declared in `.site-builder/images.json`), and gates on `astro build`. A
-  best-effort, non-gating check (`assets.ts`) warns when a staged Asset is never
-  referenced by the built Site. Pipeline-internal artifacts (the Brief, the image
+  `ui-ux-pro-max` skill (ADR-0006), sources imagery (`pexels.ts` three-tier
+  rule, slots declared in `.site-builder/images.json`), and gates on
+  `astro build`. A best-effort, non-gating check (`assets.ts`) warns when a
+  staged Asset is never referenced by the built Site. Pipeline-internal artifacts (the Brief, the image
   manifest) live under `.site-builder/` (`artifacts.ts`) rather than the project
   root, so they read as tool metadata rather than mystery files once the Site
   Version evolves into a production repo. An optional [QA session](../CONTEXT.md)
@@ -162,6 +182,18 @@ Each is a thin adapter over a domain module:
   `*.pages.dev` URL, and records it via `recordSiteVersion`. One Pages project per
   Client (slug, capped at 58 chars).
 
+Outside the fixed pipeline, **`remove`** (`src/remove/`, ADR-0012) is the
+deliberate inverse of the create path: `sb remove <client> [--version n]`
+reads the Site Version pointers off `client.json`, tears down external
+resources first (GitHub repo delete, Cloudflare Pages deployment or whole-project
+delete — order matters, since deleting local state first would strand a live
+site with no pointer left to find it by), then deletes local files and drops
+the CRM pointer. A per-Version removal compacts the surviving `vN` sequence so
+it stays gapless (renumbering the directory, `state.json`, the `client.json`
+pointer, and the GitHub repo). Confirms interactively (retype the slug) unless
+`--yes`; `--dry-run` previews the kill-list; `--local-only` skips external
+teardown; `--force` proceeds past a failed external teardown.
+
 ### Shared helpers — improving these raises the floor for every Site
 
 - `src/astro/run.ts` — the `npm install` + `astro build` compile gate (generate's
@@ -179,7 +211,9 @@ CRM commands (`list`/`show`/`set`/`edit`, plus `status`) are thin reads/writes
 over `<slug>/client.json`; `set`/`edit` touch only CRM facts, never `state.json`.
 GitHub is opt-in and orthogonal to deploy (ADR-0004): `--github` / `sb push` runs
 `gh repo create … --push` from a Site Version's git repo and records the remote,
-behind the injectable `GitHubPublisher` seam.
+behind the injectable `GitHubPublisher` seam. `sb remove` (ADR-0012, above) is
+the teardown counterpart to `init`/`push`/`deploy`, living in its own
+`src/remove/` domain module rather than the pipeline.
 
 ## Seams & testing posture
 
@@ -196,6 +230,8 @@ the real implementation in production and faked in tests:
 | `runLighthouse` (`LighthouseRunner`) | Lighthouse via chrome-launcher | …launch Chrome |
 | `deploySite` (`DeployRunner`) | wrangler Direct Upload | …shell out to wrangler / hit the network |
 | `GitHubPublisher` | `gh repo create … --push` | …shell out to `gh` |
+| `GitHubRepoDeleter` / `GitHubRepoRenamer` | `gh repo delete` / rename | …shell out to `gh` |
+| `DeploymentLister` / `DeploymentDeleter` / `ProjectDeleter` | wrangler Pages deployment/project list/delete | …shell out to wrangler / hit the network |
 
 The fakes (`test/fixtures/fake-*`) simulate the model writing its on-disk
 artifacts and stub the build/preview/Lighthouse/wrangler steps. **Never call the
