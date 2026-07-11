@@ -96,7 +96,13 @@ export const ConfigSchema = z.object({
   pexelsApiKey: z.string().optional(),
   viewports: ViewportsSchema.default({ desktop: 1440, mobile: 390 }),
   /** Default crawl page cap; overridable per run with `--pages`. */
-  pageCap: z.number().int().positive().default(10),
+  pageCap: z.number().int().positive().default(25),
+  /**
+   * How many blog posts / archive pages the crawl includes; the rest of the
+   * budget goes to core pages (home, about, services). Keep it low — a couple
+   * samples a site's tone without letting a large blog crowd out real pages.
+   */
+  blogPageCap: z.number().int().positive().default(2),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
@@ -129,5 +135,6 @@ export const DEFAULTS: Omit<Config, "root" | "pexelsApiKey"> = {
   wranglerBin: "wrangler",
   ghBin: "gh",
   viewports: { desktop: 1440, mobile: 390 },
-  pageCap: 10,
+  pageCap: 25,
+  blogPageCap: 2,
 };

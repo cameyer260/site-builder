@@ -155,7 +155,7 @@ its recorded Inputs):
 - `--docs <path>…` — PDF / Word / txt / Markdown files (repeatable or comma-separated).
 - `--images <path>…` — local images (repeatable or comma-separated).
 - `--notes <text>` — freeform notes.
-- `--pages <n>` — crawl page cap for this run (default: config `pageCap`, 10).
+- `--pages <n>` — crawl page cap for this run (default: config `pageCap`, 25).
 
 > `--docs`/`--images` paths are stored verbatim and resolved relative to your
 > current working directory whenever the run that ingests them executes — which
@@ -379,7 +379,8 @@ it.
 | `ghBin` | `gh` | For `--github` / `sb push`, and GitHub teardown for `sb remove`. |
 | `pexelsApiKey` | *(unset)* | Enables tier-2 stock imagery. |
 | `viewports.desktop` / `viewports.mobile` | `1440` / `390` | Screenshot Viewport Profiles. |
-| `pageCap` | `10` | Default crawl cap; override per run with `--pages`. |
+| `pageCap` | `25` | Default crawl cap; override per run with `--pages`. |
+| `blogPageCap` | `2` | Max blog posts/archives crawled; the rest of the budget goes to core pages. |
 
 Models are chosen by **capability role** (ADR-0013): `classify` (cheap vision — asset
 classification + Design Brief), `code` (text — the Site build), `reason` (smart text —

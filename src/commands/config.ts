@@ -151,6 +151,7 @@ async function interactiveSetup(): Promise<number> {
     pexelsApiKey: pexels.trim() || undefined,
     viewports: existing?.viewports ?? DEFAULTS.viewports,
     pageCap: existing?.pageCap ?? DEFAULTS.pageCap,
+    blogPageCap: existing?.blogPageCap ?? DEFAULTS.blogPageCap,
   };
   saveConfig(config);
 

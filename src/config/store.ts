@@ -85,6 +85,7 @@ const KEY_KINDS = {
   "viewports.desktop": "number",
   "viewports.mobile": "number",
   pageCap: "number",
+  blogPageCap: "number",
 } as const;
 
 export type ConfigKey = keyof typeof KEY_KINDS;

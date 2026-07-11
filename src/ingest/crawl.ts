@@ -5,13 +5,16 @@ import type { Logger } from "../util/log.ts";
 import { uniqueName } from "../util/names.ts";
 import type { AssetSource } from "./assets.ts";
 import { htmlToMarkdown } from "./markdown.ts";
-import { isPageWorthy, normalizeUrl, pageSlug, sameOrigin } from "./url.ts";
+import { isBlogUrl, isPageWorthy, normalizeUrl, pageSlug, sameOrigin } from "./url.ts";
 
 /**
  * The Playwright crawl: sitemap-first discovery with an internal-link BFS
- * fallback, same-origin, capped at `pageCap`. Each page is rendered (so JS
- * sites work), converted HTML→Markdown, screenshotted across all Viewport
- * Profiles, and has its `<img>`/`og:image`/favicon Asset URLs collected.
+ * fallback, same-origin, capped at `pageCap`. The homepage is always crawled,
+ * and core pages are prioritized over blog posts (of which at most a couple are
+ * pulled) so the branded, high-value pages fill the budget. Each page is
+ * rendered (so JS sites work), converted HTML→Markdown, screenshotted across all
+ * Viewport Profiles, and has its `<img>`/`og:image`/favicon/logo Asset URLs
+ * collected.
  */
 
 export interface CrawledPage {
@@ -31,6 +34,17 @@ export interface CrawlResult {
 
 const NAV_TIMEOUT_MS = 30_000;
 
+/**
+ * Quiet period after `load` before capture. Longer than a bare paint because
+ * theme headers (e.g. TheGem/WordPress) build their logo/nav in JS after `load`;
+ * at a few hundred ms the logo `<img>` isn't in the DOM yet and asset collection
+ * misses it.
+ */
+const SETTLE_MS = 1200;
+
+/** Safety bound on child sitemaps fetched from a sitemap index. */
+const MAX_CHILD_SITEMAPS = 50;
+
 async function fetchText(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
@@ -44,8 +58,32 @@ function extractLocs(xml: string): string[] {
   return [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1] as string);
 }
 
-/** Discovers up to `cap` page URLs from `/sitemap.xml` (handles sitemap indexes). */
-async function discoverFromSitemap(baseUrl: string, cap: number): Promise<string[]> {
+/**
+ * Orders discovered page URLs against the crawl budget: all core (non-blog)
+ * pages first, then at most `blogCap` blog posts, capped at `cap` total. Keeps
+ * the branded, high-value pages from being crowded out by a long tail of blog
+ * posts (which a sitemap often lists first).
+ */
+export function prioritizePages(urls: string[], cap: number, blogCap: number): string[] {
+  const core: string[] = [];
+  const blog: string[] = [];
+  for (const url of urls) {
+    (isBlogUrl(url) ? blog : core).push(url);
+  }
+  return [...core, ...blog.slice(0, blogCap)].slice(0, cap);
+}
+
+/**
+ * Discovers page URLs from `/sitemap.xml` (handling sitemap indexes), then
+ * prioritizes core pages over blog posts within `cap` (see `prioritizePages`).
+ * Unlike a plain cap, this reads *all* child sitemaps so a `page-sitemap` listed
+ * after `post-sitemap` still contributes its high-value pages.
+ */
+async function discoverFromSitemap(
+  baseUrl: string,
+  cap: number,
+  blogCap: number,
+): Promise<string[]> {
   const sitemapUrl = normalizeUrl("/sitemap.xml", baseUrl);
   if (!sitemapUrl) {
     return [];
@@ -58,10 +96,7 @@ async function discoverFromSitemap(baseUrl: string, cap: number): Promise<string
   let locs: string[];
   if (/<sitemapindex/i.test(xml)) {
     locs = [];
-    for (const child of extractLocs(xml)) {
-      if (locs.length >= cap) {
-        break;
-      }
+    for (const child of extractLocs(xml).slice(0, MAX_CHILD_SITEMAPS)) {
       const childXml = await fetchText(child);
       if (childXml) {
         locs.push(...extractLocs(childXml));
@@ -71,7 +106,7 @@ async function discoverFromSitemap(baseUrl: string, cap: number): Promise<string
     locs = extractLocs(xml);
   }
 
-  const out: string[] = [];
+  const eligible: string[] = [];
   const seen = new Set<string>();
   for (const loc of locs) {
     const normalized = normalizeUrl(loc, baseUrl);
@@ -82,13 +117,10 @@ async function discoverFromSitemap(baseUrl: string, cap: number): Promise<string
       !seen.has(normalized)
     ) {
       seen.add(normalized);
-      out.push(normalized);
-      if (out.length >= cap) {
-        break;
-      }
+      eligible.push(normalized);
     }
   }
-  return out;
+  return prioritizePages(eligible, cap, blogCap);
 }
 
 interface RawAsset {
@@ -102,14 +134,23 @@ export async function crawlSite(
   profiles: ViewportProfile[],
   screenshotDir: string,
   pageCap: number,
+  blogPageCap: number,
   log: Logger,
 ): Promise<CrawlResult> {
-  const sitemapUrls = await discoverFromSitemap(baseUrl, pageCap);
+  const home = normalizeUrl(baseUrl, baseUrl) ?? baseUrl;
+  const sitemapUrls = await discoverFromSitemap(baseUrl, pageCap, blogPageCap);
   const usingSitemap = sitemapUrls.length > 0;
-  const seed = usingSitemap ? sitemapUrls : [normalizeUrl(baseUrl, baseUrl) ?? baseUrl];
+  // Always crawl the homepage first: it carries the branded header/logo and
+  // og:image that deep pages (blog posts) often omit, and it must not be crowded
+  // out of the page budget. walkSite dedups, so a sitemap that also lists it is
+  // fine; filtering just keeps the seed tidy.
+  const seed = usingSitemap ? [home, ...sitemapUrls.filter((u) => u !== home)] : [home];
 
   const usedSlugs = new Set<string>();
   const pages: CrawledPage[] = [];
+  // Link-BFS blog budget: distinct blog URLs we've queued to follow (the sitemap
+  // path is already blog-capped by prioritizePages).
+  const blogFollowed = new Set<string>();
 
   await walkSite({
     browser,
@@ -118,7 +159,7 @@ export async function crawlSite(
     seed,
     pageCap,
     navTimeoutMs: NAV_TIMEOUT_MS,
-    settleMs: 300,
+    settleMs: SETTLE_MS,
     onLoadError: (url) => log.warn(`ingest: could not load ${url}`),
     visit: async ({ page, url }) => {
       const finalUrl = page.url();
@@ -143,9 +184,23 @@ export async function crawlSite(
       const hrefs = await page.$$eval("a[href]", (els) =>
         els.map((el) => (el as HTMLAnchorElement).href),
       );
-      return hrefs
-        .map((href) => normalizeUrl(href, finalUrl))
-        .filter((u): u is string => u !== null);
+      const follow: string[] = [];
+      for (const href of hrefs) {
+        const candidate = normalizeUrl(href, finalUrl);
+        if (!candidate) {
+          continue;
+        }
+        // Cap blog posts so a large blog doesn't consume the page budget; core
+        // pages are always followed.
+        if (isBlogUrl(candidate) && !blogFollowed.has(candidate)) {
+          if (blogFollowed.size >= blogPageCap) {
+            continue;
+          }
+          blogFollowed.add(candidate);
+        }
+        follow.push(candidate);
+      }
+      return follow;
     },
   });
 
@@ -157,7 +212,12 @@ export async function crawlSite(
   return { baseUrl, discovery, pages };
 }
 
-/** Pulls `<img>`, `og:image`, and favicon Asset URLs from the rendered page. */
+/**
+ * Pulls `<img>`, `og:image`, favicon, and logo Asset URLs from the rendered
+ * page. Beyond `document.images`, it harvests logos rendered as CSS
+ * `background-image` on logo-ish containers (which `document.images` can't see),
+ * so a brand mark isn't missed when a theme paints it as a background.
+ */
 async function collectAssets(
   page: Awaited<ReturnType<Browser["newPage"]>>,
   pageUrl: string,
@@ -170,12 +230,25 @@ async function collectAssets(
         found.push({ url: src, kind: "img" });
       }
     }
+    // Logos painted as CSS background-image (e.g. `.custom-logo`, header brand
+    // marks) rather than <img>: harvest the url() off logo-ish containers.
+    for (const el of Array.from(
+      document.querySelectorAll('[class*="logo" i], [id*="logo" i], .custom-logo, header .brand'),
+    )) {
+      const bg = getComputedStyle(el).backgroundImage;
+      const match = bg?.match(/url\((?:"|')?([^"')]+)(?:"|')?\)/i);
+      if (match?.[1]) {
+        found.push({ url: match[1], kind: "img" });
+      }
+    }
     const og = document.querySelector('meta[property="og:image"]')?.getAttribute("content");
     if (og) {
       found.push({ url: og, kind: "og" });
     }
     for (const link of Array.from(
-      document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]'),
+      document.querySelectorAll(
+        'link[rel~="icon"], link[rel="apple-touch-icon"], link[rel="mask-icon"]',
+      ),
     )) {
       const href = link.getAttribute("href");
       if (href) {

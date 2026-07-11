@@ -86,7 +86,15 @@ async function ingestSite(
   const profiles = profilesFromConfig(config.viewports);
 
   return withBrowser(async (browser) => {
-    const crawl = await crawlSite(browser, url, profiles, screenshotsDir, pageCap, log);
+    const crawl = await crawlSite(
+      browser,
+      url,
+      profiles,
+      screenshotsDir,
+      pageCap,
+      config.blogPageCap,
+      log,
+    );
 
     const usedAssetNames = new Set<string>();
     const seenAssetUrls = new Set<string>();

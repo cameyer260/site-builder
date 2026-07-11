@@ -53,7 +53,9 @@ test("set coerces numbers, validates, rejects unknown keys", () => {
   expect(setConfigValue(cfg, "engines.claudey.bin", "claudey-custom").engines.claudey.bin).toBe(
     "claudey-custom",
   );
+  expect(setConfigValue(cfg, "blogPageCap", "3").blogPageCap).toBe(3);
   expect(() => setConfigValue(cfg, "viewports.mobile", "abc")).toThrow();
   expect(() => setConfigValue(cfg, "pageCap", "-3")).toThrow();
+  expect(() => setConfigValue(cfg, "blogPageCap", "0")).toThrow();
   expect(() => setConfigValue(cfg, "nope", "x")).toThrow();
 });
