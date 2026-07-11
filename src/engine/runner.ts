@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import type { Logger } from "../util/log.ts";
-import { ADAPTERS, type EngineAdapter, type EngineKind } from "./adapter.ts";
+import { ADAPTERS, type EngineAdapter, type EngineKind, errorEventDetail } from "./adapter.ts";
 
 /**
  * Generic engine runner (ADR-0001/0010). Keeps all process lifecycle (spawn,
@@ -383,6 +383,11 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
           const status = (event as RateLimitEvent).rate_limit_info?.status ?? "unknown";
           opts.log?.info(`engine rate_limit_event (${status})`);
         }
+      } else if (event.type === "error") {
+        // An error event's payload is often the only record of *why* a run
+        // died (some engines exit non-zero with a silent stderr); trace it in
+        // full so the build log keeps the cause, not just the event type.
+        opts.log?.warn(`engine error: ${errorEventDetail(event)}`);
       } else {
         opts.log?.info(
           `engine ${event.type ?? "event"}${event.subtype ? `:${event.subtype}` : ""}`,

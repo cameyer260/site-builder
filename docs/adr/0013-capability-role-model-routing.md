@@ -20,7 +20,7 @@ The stage→role table is fixed **in code** (`engine/tiers.ts`, `STAGE_ROLE`), l
 **This lets multimodal and à-la-carte engines share one mechanism.** claudey and codey set **no** overrides — their `{best, small}` are unchanged from ADR-0010, and every role collapses onto them exactly as before (classify → sonnet/mini, the rest → opus/gpt-5.5). opencode sets its **base tiers to vision models** (so `classify` and `audit` are covered by default) and **overrides only the text roles** with cheap text models. The shipped opencode defaults become:
 
 - `small` = `google/gemini-3-flash-preview` (cheap vision) → classify
-- `best` = `google/gemini-3-pro-preview` (smart vision) → audit
+- `best` = `google/gemini-3.1-pro-preview` (smart vision) → audit
 - `modelRoles.code` = `z-ai/glm-5.2` (strong cheap coder) → generate
 - `modelRoles.reason` = `deepseek/deepseek-v4-pro` (cheap text) → synthesize
 

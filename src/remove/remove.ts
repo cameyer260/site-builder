@@ -422,7 +422,8 @@ export function previewRemoval(paths: ClientPaths, version?: number): RemovalPre
   return {
     scope: "version",
     clientDir: paths.dir,
-    mayBeActiveProduction: higher.length === 0 && sites.length > 1 && target.deployUrl !== undefined,
+    mayBeActiveProduction:
+      higher.length === 0 && sites.length > 1 && target.deployUrl !== undefined,
     versions: [
       {
         version: target.version,

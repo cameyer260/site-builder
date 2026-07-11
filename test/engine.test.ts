@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ADAPTERS } from "../src/engine/adapter.ts";
+import { ADAPTERS, errorEventDetail } from "../src/engine/adapter.ts";
 import {
   buildEngineArgs,
   type EngineOptions,
@@ -12,6 +12,7 @@ import {
   runEngine,
   type StreamEvent,
 } from "../src/engine/runner.ts";
+import type { Logger } from "../src/util/log.ts";
 
 const FAKE_ENGINE = join(import.meta.dir, "fixtures", "fake-engine.ts");
 
@@ -178,6 +179,21 @@ test("runEngine: a repeating stderr error keeps the causal first line, not just 
   expect(engineFailureReason(result)).toContain("FATAL: root cause line");
 }, 20_000);
 
+test("runEngine: an error event's payload is traced to the log, not just its type", async () => {
+  const warns: string[] = [];
+  const log: Logger = {
+    info: () => {},
+    step: () => {},
+    success: () => {},
+    warn: (m) => warns.push(m),
+    error: () => {},
+  };
+  const result = await runEngine(FAKE_ENGINE, { prompt: "ERROR_EVENT", cwd: dir, log });
+  expect(result.ok).toBe(false);
+  // The build log must keep the cause — a bare "engine error" trace loses it.
+  expect(warns.join("\n")).toContain("ProviderModelNotFoundError: model not found: nope/nope-9");
+}, 20_000);
+
 test("runEngine: a rate-limit stall is abandoned after the grace window, not the timeout", async () => {
   const result = await runEngine(FAKE_ENGINE, {
     prompt: "RATE_LIMIT_STALL",
@@ -311,6 +327,7 @@ test("codey interpretResult: non-transient error event → failure", () => {
   const r = codeyInterpret(evs, 0);
   expect(r.ok).toBe(false);
   expect(r.error).toContain("fatal error");
+  expect(r.error).toContain("Authentication failed");
 });
 
 test("codey interpretResult: non-zero exit with no turn.completed → failure", () => {
@@ -431,6 +448,7 @@ test("opencode interpretResult: fatal error event overrides clean exit", () => {
   const r = opencodeInterpret(evs, 0);
   expect(r.ok).toBe(false);
   expect(r.error).toContain("fatal error");
+  expect(r.error).toContain("Provider auth failed");
 });
 
 test("opencode interpretResult: intermediate tool_use step_finish is not fatal (exit 0)", () => {
@@ -453,4 +471,46 @@ test("opencode interpretResult: spawn error short-circuits", () => {
   const r = opencodeInterpret([], null, { spawnError: "engine binary not found: opencode" });
   expect(r.ok).toBe(false);
   expect(r.error).toContain("not found");
+});
+
+test("opencode interpretResult: non-zero exit carries the error event's payload", () => {
+  // opencode prints nothing to stderr when it dies at startup; the type:"error"
+  // event is the only record of the cause, so "engine exited 1" alone is useless.
+  const evs: StreamEvent[] = [
+    { type: "error", error: { name: "ProviderAuthError", data: { message: "invalid API key" } } },
+  ];
+  const r = opencodeInterpret(evs, 1);
+  expect(r.ok).toBe(false);
+  expect(r.error).toContain("engine exited 1");
+  expect(r.error).toContain("ProviderAuthError: invalid API key");
+});
+
+// ---- errorEventDetail (pure) ----------------------------------------------
+
+test("errorEventDetail: top-level message (codey dialect)", () => {
+  expect(errorEventDetail({ type: "error", message: "Authentication failed" })).toBe(
+    "Authentication failed",
+  );
+});
+
+test("errorEventDetail: nested error.name + error.data.message (opencode dialect)", () => {
+  const detail = errorEventDetail({
+    type: "error",
+    error: { name: "ProviderModelNotFoundError", data: { message: "model not found" } },
+  });
+  expect(detail).toBe("ProviderModelNotFoundError: model not found");
+});
+
+test("errorEventDetail: string error field", () => {
+  expect(errorEventDetail({ type: "error", error: "boom" })).toBe("boom");
+});
+
+test("errorEventDetail: unknown shape falls back to the serialized event", () => {
+  const detail = errorEventDetail({ type: "error", weird: true });
+  expect(detail).toContain('"weird":true');
+});
+
+test("errorEventDetail: long payloads are bounded", () => {
+  const detail = errorEventDetail({ type: "error", message: "x".repeat(5_000) });
+  expect(detail.length).toBeLessThanOrEqual(501);
 });

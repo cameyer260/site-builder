@@ -42,6 +42,17 @@ if (prompt.includes("BENIGN_STALL")) {
     process.stderr.write(`repeated spam line ${i}\n`);
   }
   process.exit(1);
+} else if (prompt.includes("ERROR_EVENT")) {
+  // Dies at startup the way the à-la-carte CLIs do: the cause goes to stdout
+  // as a type:"error" event (stderr stays silent), then a bare non-zero exit.
+  emit({
+    type: "error",
+    error: {
+      name: "ProviderModelNotFoundError",
+      data: { message: "model not found: nope/nope-9" },
+    },
+  });
+  process.exit(1);
 } else if (prompt.includes("FAIL")) {
   emit({
     type: "result",

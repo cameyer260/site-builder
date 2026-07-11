@@ -360,7 +360,12 @@ test("runGenerate swaps in a captured icon as the favicon, mechanically, with no
   mkdirSync(join(paths.context, "assets"), { recursive: true });
   writeFileSync(join(paths.context, "assets", "icon.png"), FAKE_ASSET_BYTES);
   profile.assets = [
-    { role: "icon", file: "assets/icon.png", source: "captured", description: "Tailored Co. favicon" },
+    {
+      role: "icon",
+      file: "assets/icon.png",
+      source: "captured",
+      description: "Tailored Co. favicon",
+    },
   ];
   const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
 

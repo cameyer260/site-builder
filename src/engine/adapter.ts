@@ -30,6 +30,44 @@ interface ResultEvent extends StreamEvent {
   usage?: unknown;
 }
 
+/** Upper bound on an extracted error detail, so it stays a readable log line. */
+const ERROR_DETAIL_CAP = 500;
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * Best-effort human message from an error-carrying stream event. The engines
+ * don't share one payload shape — codey puts `message` at the top level,
+ * opencode nests it under `error` (with the specifics under `error.data`) — so
+ * the common spots are probed in turn, and the serialized event is the bounded
+ * fallback: an ugly payload still beats discarding the only place the CLI said
+ * *why* it failed.
+ */
+export function errorEventDetail(event: StreamEvent): string {
+  const err = asRecord(event.error);
+  const message =
+    asString(event.message) ??
+    asString(event.error) ??
+    asString(asRecord(err?.data)?.message) ??
+    asString(err?.message);
+  const name = asString(err?.name);
+  const detail =
+    message !== undefined
+      ? name !== undefined
+        ? `${name}: ${message}`
+        : message
+      : JSON.stringify(event);
+  return detail.length > ERROR_DETAIL_CAP ? `${detail.slice(0, ERROR_DETAIL_CAP)}…` : detail;
+}
+
 // ---------------------------------------------------------------------------
 // claudey adapter
 // ---------------------------------------------------------------------------
@@ -148,8 +186,13 @@ const codeyAdapter: EngineAdapter = {
     if (spawnError) {
       return { ...base, ok: false, error: spawnError };
     }
-    if (events.some((e) => e.type === "turn.failed")) {
-      return { ...base, ok: false, error: "engine reported turn.failed" };
+    const turnFailed = events.find((e) => e.type === "turn.failed");
+    if (turnFailed) {
+      return {
+        ...base,
+        ok: false,
+        error: `engine reported turn.failed: ${errorEventDetail(turnFailed)}`,
+      };
     }
     // Non-transient error event: ignore "Reconnecting… X/Y" notices (R4).
     const fatalError = events.find(
@@ -158,7 +201,11 @@ const codeyAdapter: EngineAdapter = {
         !(typeof e.message === "string" && e.message.startsWith("Reconnecting")),
     );
     if (fatalError) {
-      return { ...base, ok: false, error: "engine reported a fatal error" };
+      return {
+        ...base,
+        ok: false,
+        error: `engine reported a fatal error: ${errorEventDetail(fatalError)}`,
+      };
     }
     const turnCompleted = events.find((e) => e.type === "turn.completed");
     if (!turnCompleted || exitCode !== 0) {
@@ -237,21 +284,29 @@ const opencodeAdapter: EngineAdapter = {
     if (spawnError) {
       return { ...base, ok: false, error: spawnError };
     }
-    // Exit code is primary (R2 — step_finish may be absent in early exits).
+    // Exit code is primary (R2 — step_finish may be absent in early exits),
+    // but the error event's payload is the only place the CLI says *why* (it
+    // prints nothing to stderr), so it's appended whenever one was emitted.
+    const errorEvent = events.find((e) => e.type === "error");
     if (exitCode !== 0) {
       return {
         ...base,
         ok: false,
-        error: `engine exited ${exitCode}`,
+        error: errorEvent
+          ? `engine exited ${exitCode}: ${errorEventDetail(errorEvent)}`
+          : `engine exited ${exitCode}`,
       };
     }
     // A type:"error" event overrides a clean exit code.
     // step_finish reason is NOT checked: intermediate steps (e.g. tool_use)
     // also emit step_finish with a non-"stop" reason — that's normal flow,
     // not a failure. Exit code is the authoritative verdict (R2).
-    const errorEvent = events.find((e) => e.type === "error");
     if (errorEvent) {
-      return { ...base, ok: false, error: "engine reported a fatal error" };
+      return {
+        ...base,
+        ok: false,
+        error: `engine reported a fatal error: ${errorEventDetail(errorEvent)}`,
+      };
     }
     return {
       ok: true,

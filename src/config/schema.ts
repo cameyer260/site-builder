@@ -76,7 +76,7 @@ export const ConfigSchema = z.object({
         // (classify) and `best` (audit). The text-only roles are routed below to
         // cheaper text models — DeepSeek/GLM have no vision, hence the split.
         models: {
-          best: "openrouter/google/gemini-3-pro-preview",
+          best: "openrouter/google/gemini-3.1-pro-preview",
           small: "openrouter/google/gemini-3-flash-preview",
         },
         modelRoles: {
@@ -117,7 +117,7 @@ export const DEFAULTS: Omit<Config, "root" | "pexelsApiKey"> = {
     opencode: {
       bin: "opencode",
       models: {
-        best: "openrouter/google/gemini-3-pro-preview",
+        best: "openrouter/google/gemini-3.1-pro-preview",
         small: "openrouter/google/gemini-3-flash-preview",
       },
       modelRoles: {

@@ -371,7 +371,7 @@ it.
 | `engines.codey.models.best` | `gpt-5.5` | Base best tier → `code` + `reason` + `audit`. |
 | `engines.codey.models.small` | `gpt-5.4-mini` | Base small tier → `classify`. |
 | `engines.opencode.bin` | `opencode` | Binary for the opencode engine. |
-| `engines.opencode.models.best` | `openrouter/google/gemini-3-pro-preview` | Base best tier (vision) → `audit`. |
+| `engines.opencode.models.best` | `openrouter/google/gemini-3.1-pro-preview` | Base best tier (vision) → `audit`. |
 | `engines.opencode.models.small` | `openrouter/google/gemini-3-flash-preview` | Base small tier (vision) → `classify`. |
 | `engines.opencode.modelRoles.code` | `openrouter/z-ai/glm-5.2` | `generate` build — cheap text coder (overrides best tier). |
 | `engines.opencode.modelRoles.reason` | `openrouter/deepseek/deepseek-v4-pro` | `synthesize` — cheap text (overrides best tier). |
