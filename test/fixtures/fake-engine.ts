@@ -42,6 +42,15 @@ if (prompt.includes("BENIGN_STALL")) {
     process.stderr.write(`repeated spam line ${i}\n`);
   }
   process.exit(1);
+} else if (prompt.includes("STDERR_IDENTICAL_REPEAT")) {
+  // Simulates an engine that spams the exact same multi-line error object on
+  // every failed write (e.g. opencode's EPIPE-on-a-broken-stdout-pipe bug) —
+  // the runner's excerpt should collapse these into one copy + a repeat
+  // count instead of filling the window with copies of one stanza.
+  for (let i = 0; i < 30; i++) {
+    process.stderr.write("EPIPE: broken pipe, write\n  fd: 5\n  code: EPIPE\n");
+  }
+  process.exit(1);
 } else if (prompt.includes("ERROR_EVENT")) {
   // Dies at startup the way the à-la-carte CLIs do: the cause goes to stdout
   // as a type:"error" event (stderr stays silent), then a bare non-zero exit.

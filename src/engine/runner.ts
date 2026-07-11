@@ -182,18 +182,74 @@ const EXIT_DRAIN_MS = 2_000;
 /** How much of stderr's start and end are kept for the diagnostic excerpt. */
 const STDERR_EXCERPT_CAP = 2_000;
 
+/** Longest repeating block (in lines) `collapseRepeats` looks for. */
+const COLLAPSE_MAX_PERIOD = 20;
+
+/**
+ * Collapses immediate repeats of the same multi-line block — e.g. an engine
+ * writing the same error object to stderr on every failed write — into one
+ * copy plus a repeat count. Without this, a bounded excerpt window can end up
+ * holding a dozen copies of one stanza and nothing else, which is exactly the
+ * "buries the causal line" failure `composeStderrExcerpt` otherwise guards
+ * against. Only exact, immediately-adjacent repeats collapse (no fuzzy
+ * matching), so distinct lines — including near-duplicates that differ by a
+ * line number — are left alone.
+ */
+function collapseRepeats(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const maxPeriod = Math.min(COLLAPSE_MAX_PERIOD, Math.floor((lines.length - i) / 2));
+    let collapsed = false;
+    // Smallest period first: a coarser period that happens to also repeat
+    // (e.g. 2 stanzas of a 1-stanza-periodic block) would still pass the
+    // exact-match check but collapse far less tightly than the true unit.
+    for (let period = 1; period <= maxPeriod; period++) {
+      const block = lines.slice(i, i + period).join("\n");
+      if (block === "" || lines.slice(i + period, i + period * 2).join("\n") !== block) {
+        continue;
+      }
+      let repeats = 2;
+      let cursor = i + period * 2;
+      while (
+        cursor + period <= lines.length &&
+        lines.slice(cursor, cursor + period).join("\n") === block
+      ) {
+        repeats++;
+        cursor += period;
+      }
+      out.push(block, `…(repeated ${repeats}×)…`);
+      i = cursor;
+      collapsed = true;
+      break;
+    }
+    if (!collapsed) {
+      out.push(lines[i] ?? "");
+      i++;
+    }
+  }
+  return out.join("\n");
+}
+
 /**
  * Composes the stderr excerpt from a bounded head and a rolling tail: when the
  * whole stream fit in the tail's window, it already holds everything, so it's
  * returned as-is; otherwise the head (likely the causal first line) and tail
  * (the final state) are shown with an elision marker for what's in between.
+ * Each window is independently collapsed first, so a stanza an engine spams
+ * on every attempt doesn't crowd out everything around it.
  */
 function composeStderrExcerpt(head: string, tail: string, totalLen: number): string {
   if (totalLen <= STDERR_EXCERPT_CAP) {
-    return tail;
+    return collapseRepeats(tail);
   }
+  const collapsedHead = collapseRepeats(head);
+  const collapsedTail = collapseRepeats(tail);
   const omitted = totalLen - head.length - tail.length;
-  return omitted > 0 ? `${head}\n…[${omitted} more chars]…\n${tail}` : `${head}${tail}`;
+  return omitted > 0
+    ? `${collapsedHead}\n…[${omitted} more chars]…\n${collapsedTail}`
+    : `${collapsedHead}${collapsedTail}`;
 }
 
 interface ActiveEngine {

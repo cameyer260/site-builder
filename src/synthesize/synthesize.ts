@@ -95,9 +95,17 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
     if (parsed) {
       classification = parsed;
       if (!result.ok) {
+        // Keep the console line short — the artifact already proved this call
+        // actually succeeded, so this isn't a failure worth an alarming wall
+        // of stderr. The full excerpt (still useful if the *pattern* of
+        // engine noise ever needs diagnosing) goes to the build log at info
+        // level instead of stacking onto the warning.
         log.warn(
-          `synthesize: asset classification engine reported an error but wrote a valid assets.json (${engineFailureReason(result)}); using it anyway`,
+          `synthesize: asset classification engine reported an error (${result.error ?? "unknown error"}) but wrote a valid assets.json; using it anyway`,
         );
+        if (result.stderrExcerpt?.trim()) {
+          log.info(`synthesize: asset classification stderr — ${result.stderrExcerpt.trim()}`);
+        }
       }
     } else {
       log.warn(

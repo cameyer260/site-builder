@@ -179,6 +179,16 @@ test("runEngine: a repeating stderr error keeps the causal first line, not just 
   expect(engineFailureReason(result)).toContain("FATAL: root cause line");
 }, 20_000);
 
+test("runEngine: an identically-repeating stderr stanza is collapsed, not spammed verbatim", async () => {
+  const result = await runEngine(FAKE_ENGINE, { prompt: "STDERR_IDENTICAL_REPEAT", cwd: dir });
+  expect(result.ok).toBe(false);
+  const excerpt = result.stderrExcerpt ?? "";
+  expect(excerpt).toContain("(repeated");
+  // Uncollapsed, this stanza would appear 30 times in the excerpt.
+  const occurrences = excerpt.split("EPIPE: broken pipe, write").length - 1;
+  expect(occurrences).toBeLessThan(5);
+}, 20_000);
+
 test("runEngine: an error event's payload is traced to the log, not just its type", async () => {
   const warns: string[] = [];
   const log: Logger = {

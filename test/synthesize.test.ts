@@ -433,6 +433,65 @@ test("runSynthesize trusts a valid assets.json even when the classification call
   expect(existsSync(join(paths.context, "assets", "logo.png"))).toBe(true);
 });
 
+test("runSynthesize keeps the tolerated classification-failure warning short and moves the stderr excerpt to an info trace", async () => {
+  const paths = clientPaths(root, "Acme Plumbing");
+  const logoAbs = join(paths.ingest, "site/assets/logo.png");
+  mkdirSync(join(paths.ingest, "site/assets"), { recursive: true });
+  writeFileSync(logoAbs, PNG);
+  const client = newClient("Acme Plumbing", { docs: [], images: [], notes: "n" });
+
+  const manifest = emptyManifest({
+    site: {
+      baseUrl: "http://x",
+      pageCap: 10,
+      discovery: "single",
+      pages: [],
+      assets: [
+        {
+          url: "http://x/logo.png",
+          localPath: "site/assets/logo.png",
+          kind: "img",
+          fromPage: "http://x",
+          bytes: PNG.length,
+        },
+      ],
+    },
+  });
+
+  const warns: string[] = [];
+  const infos: string[] = [];
+  const spyLog = {
+    ...log,
+    warn: (m: string) => warns.push(m),
+    info: (m: string) => infos.push(m),
+  };
+  const stderrExcerpt = "EPIPE: broken pipe, write\n  fd: 5\n".repeat(20);
+
+  await runSynthesize({
+    paths,
+    config,
+    client,
+    manifest,
+    log: spyLog,
+    engine: fakeStageEngine({
+      assetsJson: {
+        assets: [{ source: logoAbs, role: "logo", keep: true, description: "Acme logo" }],
+      },
+      failClassification: true,
+      classificationStderrExcerpt: stderrExcerpt,
+    }),
+  });
+
+  // The console-facing warning stays a one-liner — no raw stderr dump.
+  const classificationWarn = warns.find((w) => w.includes("using it anyway"));
+  expect(classificationWarn).toBeDefined();
+  expect(classificationWarn).not.toContain("EPIPE");
+  expect(classificationWarn?.length ?? Infinity).toBeLessThan(200);
+
+  // The full excerpt is still captured, just at info level instead.
+  expect(infos.some((i) => i.includes("EPIPE") && i.includes("stderr"))).toBe(true);
+});
+
 async function expectSynthesizeError(
   engine: ReturnType<typeof fakeStageEngine>,
   pattern: RegExp,

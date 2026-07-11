@@ -31,6 +31,8 @@ export interface FakeStageEngineOptions {
    * classification but reports a spurious non-zero exit.
    */
   failClassification?: boolean;
+  /** `stderrExcerpt` attached to a forced classification failure, if any. */
+  classificationStderrExcerpt?: string;
   /** Payload written to `profile.json` for the profile call. */
   profileJson?: unknown;
   /** Contents written to `profile.md`. */
@@ -104,6 +106,7 @@ export function fakeStageEngine(options: FakeStageEngineOptions = {}): EngineRun
           exitCode: 1,
           events: [],
           error: "forced classification failure",
+          stderrExcerpt: options.classificationStderrExcerpt,
         };
       }
       return ok();
