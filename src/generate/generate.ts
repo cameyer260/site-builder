@@ -41,7 +41,7 @@ import { type QaAsk, runQaSession } from "./qa.ts";
  */
 
 const GENERATE_BUDGET_USD = 10;
-const GENERATE_TIMEOUT_MS = 1_800_000;
+const GENERATE_TIMEOUT_MS = 2_400_000;
 
 export interface GenerateParams {
   paths: ClientPaths;
