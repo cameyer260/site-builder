@@ -13,25 +13,16 @@ interface Props {
 const { hours, title = "Hours", class: className = "" } = Astro.props;
 ---
 
+{/* Neutral hours list — a structured <dl>. Restyle to fit the Design Brief. */}
 <div class={className}>
-  <div class="flex items-center gap-2 mb-3">
-    <svg class="w-4 h-4 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10"/>
-      <polyline points="12 6 12 12 16 14"/>
-    </svg>
-    <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">
-      {title}
-    </p>
-  </div>
-  <dl class="divide-y divide-ink-100 rounded-xl border border-ink-200 bg-linear-to-br from-white to-ink-50 overflow-hidden">
+  <p class="mb-3 text-sm font-semibold text-ink-900">{title}</p>
+  <dl class="divide-y divide-ink-100 rounded-md border border-ink-200">
     {hours.map((entry) => {
       const closed = /closed/i.test(entry.hours);
       return (
-        <div class="flex items-center justify-between gap-4 px-4 py-3 text-base hover:bg-white motion-safe:transition-colors">
-          <dt class="text-ink-900 font-medium">{entry.day}</dt>
-          <dd class={`text-sm ${closed ? "text-ink-400" : "text-ink-700 font-medium"}`}>
-            {entry.hours}
-          </dd>
+        <div class="flex items-center justify-between gap-4 px-4 py-3">
+          <dt class="font-medium text-ink-900">{entry.day}</dt>
+          <dd class={closed ? "text-ink-400" : "text-ink-700"}>{entry.hours}</dd>
         </div>
       );
     })}

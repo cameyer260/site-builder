@@ -8,38 +8,33 @@ interface NavLink {
 
 interface Props {
   siteName: string;
-  /** Optional logo mark (the graphic symbol, not text). The siteName
-   *  is always rendered in HTML next to it for accessibility and SEO. */
+  /** Optional logo mark (the graphic symbol). siteName is always rendered as
+   *  text alongside it for accessibility and SEO. */
   logoMark?: ImageMetadata;
   links: readonly NavLink[];
   ctaLabel?: string;
   ctaHref?: string;
-  /** Override CTA button color classes. Some industries use accent instead of brand
-   *  (e.g. non-profit "Donate Now" in accent-500, pet-services "Book Now" in accent-500). */
-  ctaColorClass?: string;
   class?: string;
 }
 
-const {
-  siteName,
-  logoMark,
-  links,
-  ctaLabel,
-  ctaHref,
-  ctaColorClass = "bg-brand-600 hover:bg-brand-700 focus-visible:ring-brand-500",
-  class: className = "",
-} = Astro.props;
-
-const pathname = Astro.url.pathname;
-const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+const { siteName, logoMark, links, ctaLabel, ctaHref, class: className = "" } = Astro.props;
 ---
 
-<header
-  class={`sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-ink-200/70 motion-safe:transition-shadow duration-300 data-[scrolled=true]:shadow-md data-[scrolled=true]:bg-white/95 ${className}`}
-  data-site-header
->
-  <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between" aria-label="Primary">
-    <a href="/" class="flex items-center gap-2.5 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+{/*
+  Neutral skeleton header. Semantic and accessible, but deliberately plain — no
+  imposed look (no sticky/blur/gradient/animation/decoration). This is the
+  shared header for every page, so the <header> landmark and primary nav stay
+  consistent site-wide; you are expected to restyle and compose it (layout,
+  responsive/mobile behavior, active states, any decoration) to fit the Design
+  Brief, the same way you compose the page bodies. Relies on the browser's
+  default focus outline — keep focus visible if you restyle.
+*/}
+<header class={className}>
+  <nav
+    class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center gap-x-6 gap-y-2"
+    aria-label="Primary"
+  >
+    <a href="/" class="flex items-center gap-2 font-semibold text-ink-900">
       {logoMark && (
         <img
           src={logoMark.src}
@@ -47,144 +42,24 @@ const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.s
           aria-hidden="true"
           width={logoMark.width}
           height={logoMark.height}
-          class="h-7 w-auto shrink-0 max-w-[112px] motion-safe:transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+          class="h-8 w-auto"
         />
       )}
-      <span class="font-bold text-xl text-ink-900 group-hover:text-brand-700 motion-safe:transition-colors tracking-tight">
-        {siteName}
-      </span>
+      <span>{siteName}</span>
     </a>
 
-    <ul class="hidden md:flex items-center gap-1">
+    <ul class="flex flex-wrap items-center gap-4">
       {links.map((link) => (
         <li>
-          <a
-            href={link.href}
-            aria-current={isActive(link.href) ? "page" : undefined}
-            class={`relative px-3 py-2 rounded-lg text-sm font-medium motion-safe:transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${isActive(link.href) ? "text-brand-700" : "text-ink-700 hover:text-ink-900"}`}
-          >
-            {link.label}
-            <span
-              class={`absolute left-3 right-3 -bottom-px h-0.5 bg-linear-to-r from-brand-700 via-brand-500 to-brand-800 rounded-full motion-safe:transition-transform duration-300 origin-left ${isActive(link.href) ? "scale-x-100" : "scale-x-0"}`}
-              aria-hidden="true"
-            ></span>
-          </a>
+          <a href={link.href} class="text-ink-700 hover:text-ink-900">{link.label}</a>
         </li>
       ))}
     </ul>
 
-    <div class="hidden md:flex items-center gap-3">
-      {ctaLabel && ctaHref && (
-        <a
-          href={ctaHref}
-          class={`group relative inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-white text-sm font-semibold motion-safe:transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${ctaColorClass}`}
-        >
-          <span
-            class="absolute inset-0 -translate-x-full group-hover:translate-x-full motion-safe:transition-transform duration-700 bg-linear-to-r from-transparent via-white/25 to-transparent"
-            aria-hidden="true"
-          ></span>
-          <span class="relative">{ctaLabel}</span>
-          <svg class="relative w-3.5 h-3.5 motion-safe:transition-transform duration-200 group-hover:translate-x-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 8h12M9 3l5 5-5 5"/>
-          </svg>
-        </a>
-      )}
-    </div>
-
-    <button
-      type="button"
-      class="md:hidden inline-flex items-center justify-center h-10 w-10 rounded-lg text-ink-700 hover:bg-ink-100 motion-safe:transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-      aria-label="Toggle menu"
-      aria-expanded="false"
-      aria-controls="mobile-nav"
-      data-mobile-toggle
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon-menu>
-        <line x1="4" y1="6" x2="20" y2="6"></line>
-        <line x1="4" y1="12" x2="20" y2="12"></line>
-        <line x1="4" y1="18" x2="20" y2="18"></line>
-      </svg>
-      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden" data-icon-close>
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </button>
+    {ctaLabel && ctaHref && (
+      <a href={ctaHref} class="font-medium text-ink-900 underline underline-offset-4">
+        {ctaLabel}
+      </a>
+    )}
   </nav>
-
-  <div
-    class="md:hidden border-t border-ink-200 bg-white overflow-hidden grid grid-rows-[0fr] motion-safe:transition-[grid-template-rows] duration-300 ease-out data-[open=true]:grid-rows-[1fr]"
-    id="mobile-nav"
-    data-mobile-menu
-    data-open="false"
-  >
-    <div class="min-h-0">
-      <ul class="px-4 py-3 space-y-1">
-        {links.map((link, i) => (
-          <li>
-            <a
-              href={link.href}
-              aria-current={isActive(link.href) ? "page" : undefined}
-              class={`flex items-center justify-between py-3 px-3 rounded-lg font-medium motion-safe:transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${isActive(link.href) ? "text-brand-700 bg-brand-50" : "text-ink-700 hover:text-ink-900 hover:bg-ink-100"}`}
-              style={`transition-delay: ${i * 30}ms;`}
-            >
-              <span>{link.label}</span>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="text-ink-400">
-                <path d="M6 4l4 4-4 4"/>
-              </svg>
-            </a>
-          </li>
-        ))}
-        {ctaLabel && ctaHref && (
-          <li class="pt-3 pb-1">
-            <a
-              href={ctaHref}
-              class={`flex w-full items-center justify-center gap-2 h-12 rounded-lg text-white font-semibold text-sm motion-safe:transition-colors shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${ctaColorClass}`}
-            >
-              {ctaLabel}
-              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M2 8h12M9 3l5 5-5 5"/>
-              </svg>
-            </a>
-          </li>
-        )}
-      </ul>
-    </div>
-  </div>
 </header>
-
-<script>
-  const toggle = document.querySelector<HTMLButtonElement>("[data-mobile-toggle]");
-  const menu = document.querySelector<HTMLElement>("[data-mobile-menu]");
-  const iconMenu = document.querySelector<SVGElement>("[data-icon-menu]");
-  const iconClose = document.querySelector<SVGElement>("[data-icon-close]");
-  const header = document.querySelector<HTMLElement>("[data-site-header]");
-
-  toggle?.addEventListener("click", () => {
-    const isOpen = menu?.dataset.open === "true";
-    const next = !isOpen;
-    if (menu) menu.dataset.open = String(next);
-    toggle.setAttribute("aria-expanded", String(next));
-    iconMenu?.classList.toggle("hidden", next);
-    iconClose?.classList.toggle("hidden", !next);
-  });
-
-  // Close mobile menu when a link inside is tapped.
-  menu?.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => {
-      if (menu.dataset.open === "true") {
-        menu.dataset.open = "false";
-        toggle?.setAttribute("aria-expanded", "false");
-        iconMenu?.classList.remove("hidden");
-        iconClose?.classList.add("hidden");
-      }
-    });
-  });
-
-  // Shadow + opacity bump after the user scrolls a bit.
-  const updateScrolled = () => {
-    if (!header) return;
-    header.dataset.scrolled = String(window.scrollY > 8);
-  };
-  updateScrolled();
-  window.addEventListener("scroll", updateScrolled, { passive: true });
-</script>

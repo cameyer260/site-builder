@@ -49,20 +49,17 @@
   --shadow-lift: 0 10px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.08);
   --shadow-glow: 0 0 0 1px var(--color-brand-100), 0 8px 30px -8px var(--color-brand-400);
 
-  /* Animation tokens — Tailwind v4 generates `animate-{name}` utilities. */
+  /*
+   * Neutral entrance animations only — Tailwind v4 generates `animate-{name}`
+   * utilities from these. Decorative/signature motion (drifting blobs, glow,
+   * gradient/mesh drift, shimmer, marquee) is deliberately NOT shipped: the look
+   * for each Site — including any decorative effects — is composed per Client
+   * at build time, so generated Sites don't converge on one motif.
+   */
   --animate-fade-in: fade-in 0.6s ease-out both;
   --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-down: fade-down 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-scale-in: scale-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  --animate-float-slow: float 8s ease-in-out infinite;
-  --animate-float-medium: float 6s ease-in-out infinite;
-  --animate-blob: blob 14s ease-in-out infinite;
-  --animate-shimmer: shimmer 2.4s linear infinite;
-  --animate-bounce-subtle: bounce-subtle 1.8s ease-in-out infinite;
-  --animate-pulse-glow: pulse-glow 2.5s ease-in-out infinite;
-  --animate-gradient-x: gradient-x 8s ease-in-out infinite;
-  --animate-marquee: marquee 28s linear infinite;
-  --animate-spin-slow: spin 12s linear infinite;
 }
 
 /* Keyframes consumed by the @theme --animate-* tokens above. */
@@ -102,72 +99,6 @@
   to {
     opacity: 1;
     transform: scale(1);
-  }
-}
-@keyframes float {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -14px, 0);
-  }
-}
-@keyframes blob {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  33% {
-    transform: translate3d(20px, -30px, 0) scale(1.08);
-  }
-  66% {
-    transform: translate3d(-15px, 18px, 0) scale(0.95);
-  }
-}
-@keyframes shimmer {
-  from {
-    background-position: -200% 0;
-  }
-  to {
-    background-position: 200% 0;
-  }
-}
-@keyframes bounce-subtle {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 var(--color-brand-400, rgb(59 130 246 / 0.45));
-    opacity: 1;
-  }
-  50% {
-    box-shadow: 0 0 0 12px transparent;
-    opacity: 0.85;
-  }
-}
-@keyframes gradient-x {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
   }
 }
 
@@ -225,56 +156,5 @@
       transform: none;
       transition: none;
     }
-  }
-
-  /* Animated mesh gradient used by Hero/FAQ/CTA backgrounds. Deep navy base with
-     vivid brand-blue and a subtle accent (amber) shimmer for warmth. */
-  .bg-mesh-brand {
-    background-color: var(--color-brand-900);
-    background-image:
-      radial-gradient(at 15% 12%, oklch(0.48 0.2 250 / 0.95) 0px, transparent 55%),
-      radial-gradient(at 82% 18%, oklch(0.62 0.18 60 / 0.32) 0px, transparent 50%),
-      radial-gradient(at 28% 88%, oklch(0.42 0.18 250 / 0.85) 0px, transparent 55%),
-      radial-gradient(at 88% 82%, oklch(0.55 0.2 250 / 0.55) 0px, transparent 55%);
-  }
-  .bg-mesh-dark {
-    background-color: var(--color-ink-950);
-    background-image:
-      radial-gradient(at 18% 12%, oklch(0.4 0.18 250 / 0.95) 0px, transparent 55%),
-      radial-gradient(at 82% 22%, oklch(0.62 0.18 60 / 0.3) 0px, transparent 50%),
-      radial-gradient(at 60% 90%, oklch(0.32 0.14 250 / 0.95) 0px, transparent 55%);
-  }
-  /* Soft, atmospheric light gradient — for the "white" sections so they're
-     not bald. The color spans the whole surface so it doesn't cut off at
-     section edges like positioned blobs do. */
-  .bg-mesh-light {
-    background-color: var(--color-brand-50);
-    background-image:
-      radial-gradient(at 22% 15%, oklch(0.86 0.08 250 / 0.55) 0px, transparent 55%),
-      radial-gradient(at 78% 25%, oklch(0.93 0.06 60 / 0.2) 0px, transparent 50%),
-      radial-gradient(at 30% 85%, oklch(0.88 0.1 250 / 0.5) 0px, transparent 55%),
-      radial-gradient(at 82% 88%, oklch(0.86 0.08 250 / 0.55) 0px, transparent 55%);
-  }
-
-  /* Subtle dot grid background. */
-  .bg-dot-grid {
-    background-image: radial-gradient(currentColor 1px, transparent 1px);
-    background-size: 24px 24px;
-    color: var(--color-ink-200);
-  }
-
-  /* Gradient text helper. */
-  .text-gradient-brand {
-    background: linear-gradient(
-      110deg,
-      var(--color-brand-800),
-      var(--color-brand-500) 55%,
-      var(--color-brand-700)
-    );
-    background-size: 200% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    animation: gradient-x 7s ease-in-out infinite;
   }
 }

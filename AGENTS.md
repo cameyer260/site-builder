@@ -28,7 +28,9 @@ CLI — the **Engine** (`claudey` by default, or `codey`/`opencode` via `--engin
   (captured Assets are staged into the Site Version by code before the build
   call runs, not copied by the Engine), 0012 (removal & teardown: `sb remove`
   is the inverse of create — external teardown first, then gapless Site Version
-  compaction).
+  compaction), 0015 (the Kit ships primitives + near-empty page skeletons, not
+  a finished template; the per-Client look is composed at build time from the
+  Design Brief the Engine derives from the Client Profile).
 - **`docs/roadmap.md`** — what is *explicitly out of scope for v1*; don't build these
   without being asked.
 

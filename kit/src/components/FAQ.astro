@@ -12,15 +12,20 @@ interface Props {
 const { items, class: className = "" } = Astro.props;
 ---
 
+{/*
+  Accessible FAQ accordion: native <details>/<summary> (keyboard + screen-reader
+  + no-JS toggle) with a JS height animation that honors prefers-reduced-motion.
+  The behavior and a11y are the functional floor — keep the data-faq /
+  data-faq-panel hooks, the `is-open` class, and the script. The styling is
+  deliberately neutral; restyle to fit the Design Brief.
+*/}
 <div data-faq class={`space-y-3 ${className}`}>
   {items.map((item) => (
-    <details
-      class="group rounded-xl border border-ink-200 bg-white shadow-(--shadow-card) overflow-hidden hover:border-brand-200 hover:shadow-(--shadow-lift) motion-safe:transition-[border-color,box-shadow] duration-300 [&.is-open]:border-brand-300 [&.is-open]:shadow-(--shadow-lift)"
-    >
-      <summary class="flex items-center justify-between cursor-pointer list-none gap-4 px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500">
-        <span class="text-base font-semibold text-ink-900 group-hover:text-brand-700 group-[.is-open]:text-brand-700 motion-safe:transition-colors">{item.question}</span>
+    <details class="group overflow-hidden rounded-lg border border-ink-200">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-400">
+        <span class="font-medium text-ink-900">{item.question}</span>
         <span
-          class="shrink-0 w-8 h-8 rounded-full border border-ink-200 bg-linear-to-br from-ink-50 to-ink-100 text-ink-600 flex items-center justify-center motion-safe:transition-all duration-300 group-[.is-open]:rotate-45 group-[.is-open]:from-brand-500 group-[.is-open]:to-brand-600 group-[.is-open]:border-brand-500 group-[.is-open]:text-white group-[.is-open]:shadow-md group-[.is-open]:shadow-brand-500/30"
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-ink-200 text-ink-600 motion-safe:transition-transform duration-300 group-[.is-open]:rotate-45"
           aria-hidden="true"
         >
           <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -30,7 +35,7 @@ const { items, class: className = "" } = Astro.props;
         </span>
       </summary>
       <div data-faq-panel class="overflow-hidden">
-        <p class="px-6 pb-5 text-ink-600 leading-relaxed text-base border-t border-ink-100 pt-4 pr-12">{item.answer}</p>
+        <p class="border-t border-ink-100 px-5 pb-4 pt-4 text-ink-600 leading-relaxed">{item.answer}</p>
       </div>
     </details>
   ))}
@@ -46,9 +51,9 @@ const { items, class: className = "" } = Astro.props;
   // screen readers, no-JS toggle) and animate the element's height with the
   // Web Animations API on toggle — which works the same everywhere.
   //
-  // The open-state visuals (icon, border, shadow) are driven by an `is-open`
-  // class rather than the native [open] attribute. That lets them ease back to
-  // the closed look at the *start* of the collapse — while [open] must stay set
+  // The open-state visuals (icon rotation) are driven by an `is-open` class
+  // rather than the native [open] attribute. That lets them ease back to the
+  // closed look at the *start* of the collapse — while [open] must stay set
   // until the height animation ends so the content is still rendered — keeping
   // the open and close transitions perfectly symmetric.
   //
@@ -96,7 +101,7 @@ const { items, class: className = "" } = Astro.props;
 
     const shrink = () => {
       state = "shrinking";
-      // Drop the open look now so the icon/border ease out with the collapse,
+      // Drop the open look now so the icon eases out with the collapse,
       // even though [open] stays set until the animation finishes.
       details.classList.remove("is-open");
       animateTo(details.offsetHeight, summary.offsetHeight, false);

@@ -1,0 +1,156 @@
+---
+import type { ImageMetadata } from "astro";
+
+interface FooterLink {
+  label: string;
+  href: string;
+}
+
+interface FooterGroup {
+  title: string;
+  links: readonly FooterLink[];
+}
+
+interface Social {
+  label: string;
+  href: string;
+}
+
+interface Props {
+  siteName: string;
+  /** Logo mark. Pass the same colored mark used in the nav — the footer inverts it to white via CSS filter. Omit to show siteName text only. */
+  logoMark?: ImageMetadata;
+  tagline?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  groups?: readonly FooterGroup[];
+  socials?: readonly Social[];
+  class?: string;
+}
+
+const {
+  siteName,
+  logoMark,
+  tagline,
+  phone,
+  email,
+  address,
+  groups = [],
+  socials = [],
+  class: className = "",
+} = Astro.props;
+
+const year = new Date().getFullYear();
+const copyrightName = siteName.replace(/\.$/, "");
+---
+
+<footer class={`relative bg-ink-950 text-ink-300 overflow-hidden ${className}`}>
+  <!-- Soft top fade — brand-900 bleeds in from the CTA above and dissolves into the footer -->
+  <div
+    class="absolute inset-x-0 top-0 h-40 bg-linear-to-b from-brand-900 via-brand-900/40 to-transparent pointer-events-none"
+    aria-hidden="true"
+  ></div>
+  <!-- Top gradient hairline -->
+  <div
+    class="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-brand-500/70 to-transparent"
+    aria-hidden="true"
+  ></div>
+  <!-- Ambient glow -->
+  <div
+    class="absolute -top-32 left-1/2 -translate-x-1/2 w-[680px] h-[300px] rounded-full bg-brand-600/25 blur-3xl pointer-events-none"
+    aria-hidden="true"
+  ></div>
+
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-ink-800/80">
+      <div class="lg:col-span-1">
+        <div class="flex items-center gap-2.5">
+          {logoMark && (
+            <img
+              src={logoMark.src}
+              alt=""
+              aria-hidden="true"
+              width={logoMark.width}
+              height={logoMark.height}
+              class="h-7 w-auto shrink-0 max-w-[112px] brightness-0 invert"
+            />
+          )}
+          <p class="font-bold text-xl text-white tracking-tight">{siteName}</p>
+        </div>
+        {tagline && <p class="mt-3 text-sm text-ink-400 leading-relaxed max-w-xs">{tagline}</p>}
+
+        <address class="not-italic mt-6 space-y-2 text-sm text-ink-400">
+          {phone && (
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-brand-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} class="hover:text-white transition-colors">
+                {phone}
+              </a>
+            </div>
+          )}
+          {email && (
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-brand-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+              <a href={`mailto:${email}`} class="hover:text-white transition-colors">{email}</a>
+            </div>
+          )}
+          {address && (
+            <div class="flex items-start gap-2 text-ink-400">
+              <svg class="w-4 h-4 text-brand-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              <span>{address}</span>
+            </div>
+          )}
+        </address>
+      </div>
+
+      {groups.map((group) => (
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-widest text-white/90 mb-4">
+            {group.title}
+          </p>
+          <ul class="space-y-3">
+            {group.links.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  class="group inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-white motion-safe:transition-colors"
+                >
+                  <span class="motion-safe:transition-transform duration-200 group-hover:translate-x-1">{link.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+
+    <div class="mt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <p class="text-xs text-ink-400">&copy; {year} {copyrightName}. All rights reserved.</p>
+      {socials.length > 0 && (
+        <ul class="flex items-center gap-2">
+          {socials.map((s) => (
+            <li>
+              <a
+                href={s.href}
+                class="inline-flex items-center justify-center px-3 py-1.5 rounded-full text-xs text-ink-400 border border-ink-800 hover:text-white hover:border-brand-500 hover:bg-brand-500/10 motion-safe:transition-colors"
+                rel="noopener"
+                target="_blank"
+              >
+                {s.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </div>
+</footer>

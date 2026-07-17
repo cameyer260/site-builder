@@ -12,8 +12,20 @@ import type { Logger } from "../util/log.ts";
  * refinements live in that version's history (CONTEXT.md > Site Version).
  */
 
-/** Build artifacts and local state never copied from the Kit into a Site. */
-const SKIP_ENTRIES = new Set(["node_modules", ".astro", "dist", ".git", ".DS_Store", "state.json"]);
+/**
+ * Build artifacts, local state, and the maintainer-only `examples/` (reference
+ * snapshots of the old finished template — see `kit/examples/README.md`) never
+ * copied from the Kit into a Site.
+ */
+const SKIP_ENTRIES = new Set([
+  "node_modules",
+  ".astro",
+  "dist",
+  ".git",
+  ".DS_Store",
+  "state.json",
+  "examples",
+]);
 
 // state.json is machine-managed pipeline bookkeeping (completed stages, run
 // status, timestamps) with no lasting value once generation finishes — kept

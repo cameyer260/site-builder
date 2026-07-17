@@ -1,109 +1,14 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import SectionHeading from "@/components/SectionHeading.astro";
-import ContactForm from "@/components/ContactForm.astro";
-import BusinessHours from "@/components/BusinessHours.astro";
-import MapEmbed from "@/components/MapEmbed.astro";
-import { site } from "@/data/site";
 ---
-
-<BaseLayout title="Contact" description="Get in touch — we respond within one business day.">
-  <!-- Header strip -->
-  <section class="relative bg-mesh-brand overflow-hidden">
-    <div class="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full bg-brand-500/40 blur-3xl pointer-events-none motion-safe:animate-blob" aria-hidden="true"></div>
-    <div class="absolute -bottom-32 -left-32 w-[420px] h-[420px] rounded-full bg-accent-500/15 blur-3xl pointer-events-none motion-safe:animate-blob" style="animation-delay: -5s;" aria-hidden="true"></div>
-    <div class="absolute inset-0 bg-dot-grid opacity-[0.08] text-white pointer-events-none" aria-hidden="true"></div>
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-24">
-      <SectionHeading
-        eyebrow="Contact"
-        title="Let's talk."
-        description="Send us a message and we'll get back to you within one business day."
-        as="h1"
-        tone="dark"
-      />
-    </div>
-  </section>
-
-  <section class="relative bg-mesh-light py-16 sm:py-20 overflow-hidden">
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Form card -->
-        <div
-          class="bg-linear-to-br from-white to-ink-50 rounded-2xl border border-ink-200 shadow-(--shadow-card) p-6 sm:p-8"
-          data-reveal
-        >
-          <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-widest text-brand-700 mb-2">Send a message</p>
-            <h2 class="text-2xl font-bold text-ink-900">Tell us about your project</h2>
-          </div>
-          <ContactForm />
-        </div>
-
-        <!-- Info card -->
-        <div
-          class="bg-linear-to-br from-white to-ink-50 rounded-2xl border border-ink-200 shadow-(--shadow-card) p-6 sm:p-8 space-y-8"
-          data-reveal
-          data-reveal-delay="120"
-        >
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-widest text-brand-700 mb-4">
-              Reach us directly
-            </p>
-            <div class="space-y-3 text-base">
-              <div class="group flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 ring-1 ring-brand-100 group-hover:bg-brand-100 motion-safe:transition-colors">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-xs text-ink-500">Phone</p>
-                  <p>
-                    <a href={`tel:${site.phone.replace(/[^\d+]/g, "")}`} class="text-ink-900 font-medium hover:text-brand-700 transition-colors">
-                      {site.phone}
-                    </a>
-                  </p>
-                </div>
-              </div>
-              <div class="group flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 ring-1 ring-brand-100 group-hover:bg-brand-100 motion-safe:transition-colors">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                    <polyline points="22,6 12,13 2,6"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-xs text-ink-500">Email</p>
-                  <p>
-                    <a href={`mailto:${site.email}`} class="text-ink-900 font-medium hover:text-brand-700 transition-colors">
-                      {site.email}
-                    </a>
-                  </p>
-                </div>
-              </div>
-              <div class="group flex items-start gap-3">
-                <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 ring-1 ring-brand-100 group-hover:bg-brand-100 motion-safe:transition-colors">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                    <circle cx="12" cy="10" r="3"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-xs text-ink-500">Address</p>
-                  <p class="text-ink-900 font-medium">{site.address}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <BusinessHours hours={[...site.hours]} />
-
-          <MapEmbed
-            src={`https://maps.google.com/maps?q=${encodeURIComponent(site.address)}&output=embed`}
-            title={`${site.name} location`}
-          />
-        </div>
-      </div>
-    </div>
+<BaseLayout title="Contact">
+  {/* Skeleton page. Compose this from the Kit's primitives (and/or your own new
+      components) to realize the Design Brief. Do not ship this
+      placeholder. */}
+  <section class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+    <h1 class="text-4xl font-bold tracking-tight text-ink-900">Contact</h1>
+    <p class="mt-4 text-lg text-ink-600">
+      Replace this skeleton with a contact page composition that fits the Design Brief.
+    </p>
   </section>
 </BaseLayout>

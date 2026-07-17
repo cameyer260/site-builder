@@ -1,5 +1,7 @@
 # `generate` builds on a curated Kit that sets the floor, not the look
 
+*Amended by ADR-0015 (empty page skeletons; the look is composed per Client).*
+
 `generate` does not hand Claude a blank Astro project, nor a rigid fixed template. It copies a hand-maintained, opinionated **Astro + Tailwind Kit** into `sites/vN/` and has `claude -p` build the Site on top of it.
 
 **What the Kit owns (the floor — guaranteed every site):**

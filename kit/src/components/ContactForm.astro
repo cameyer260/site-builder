@@ -24,94 +24,69 @@ const {
   messagePlaceholder = "Tell us a bit about your project or question…",
   class: className = "",
 } = Astro.props;
+
+const fieldClass =
+  "w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-ink-900 placeholder:text-ink-400 focus:border-ink-500 focus:outline-none focus:ring-2 focus:ring-ink-400";
 ---
 
-<form
-  {...(action ? { action, method } : {})}
-  class={`space-y-5 ${className}`}
->
-  <p class="text-xs text-ink-500"><span class="text-brand-600" aria-hidden="true">*</span> Required fields</p>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-    <label class="block group">
-      <span class="block text-sm font-medium text-ink-900 mb-1.5">Name <span class="text-brand-600" aria-hidden="true">*</span></span>
-      <div class="relative">
-        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 group-focus-within:text-brand-600 motion-safe:transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-        <input
-          type="text"
-          name="name"
-          required
-          autocomplete="name"
-          placeholder="Jane Smith"
-          class="peer w-full h-11 pl-10 pr-3.5 rounded-xl border border-ink-200 bg-white text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none motion-safe:transition-all"
-        />
-      </div>
+{/*
+  Neutral, accessible contact form. Labels, required fields, autocomplete, and
+  visible focus states are the functional floor — keep them. The styling is
+  deliberately plain; restyle to fit the Design Brief.
+*/}
+<form {...(action ? { action, method } : {})} class={`space-y-5 ${className}`}>
+  <p class="text-sm text-ink-500">Fields marked * are required.</p>
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <label class="block">
+      <span class="mb-1.5 block text-sm font-medium text-ink-900">Name *</span>
+      <input
+        type="text"
+        name="name"
+        required
+        autocomplete="name"
+        placeholder="Jane Smith"
+        class={fieldClass}
+      />
     </label>
-    <label class="block group">
-      <span class="block text-sm font-medium text-ink-900 mb-1.5">Email <span class="text-brand-600" aria-hidden="true">*</span></span>
-      <div class="relative">
-        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 group-focus-within:text-brand-600 motion-safe:transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-          <polyline points="22,6 12,13 2,6"/>
-        </svg>
-        <input
-          type="email"
-          name="email"
-          required
-          autocomplete="email"
-          placeholder="jane@example.com"
-          class="peer w-full h-11 pl-10 pr-3.5 rounded-xl border border-ink-200 bg-white text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none motion-safe:transition-all"
-        />
-      </div>
+    <label class="block">
+      <span class="mb-1.5 block text-sm font-medium text-ink-900">Email *</span>
+      <input
+        type="email"
+        name="email"
+        required
+        autocomplete="email"
+        placeholder="jane@example.com"
+        class={fieldClass}
+      />
     </label>
   </div>
 
   {showPhoneField && (
-    <label class="block group">
-      <span class="block text-sm font-medium text-ink-900 mb-1.5">
-        Phone <span class="text-ink-400 font-normal">(optional)</span>
+    <label class="block">
+      <span class="mb-1.5 block text-sm font-medium text-ink-900">
+        Phone <span class="font-normal text-ink-400">(optional)</span>
       </span>
-      <div class="relative">
-        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 group-focus-within:text-brand-600 motion-safe:transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
-        </svg>
-        <input
-          type="tel"
-          name="phone"
-          autocomplete="tel"
-          placeholder="(555) 000-0000"
-          class="w-full h-11 pl-10 pr-3.5 rounded-xl border border-ink-200 bg-white text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none motion-safe:transition-all"
-        />
-      </div>
+      <input type="tel" name="phone" autocomplete="tel" placeholder="(555) 000-0000" class={fieldClass} />
     </label>
   )}
 
   {Astro.slots.has("fields") && <slot name="fields" />}
 
-  <label class="block group">
-    <span class="block text-sm font-medium text-ink-900 mb-1.5">{messageLabel} <span class="text-brand-600" aria-hidden="true">*</span></span>
+  <label class="block">
+    <span class="mb-1.5 block text-sm font-medium text-ink-900">{messageLabel} *</span>
     <textarea
       name="message"
       rows="5"
       required
       placeholder={messagePlaceholder}
-      class="w-full px-3.5 py-3 rounded-xl border border-ink-200 bg-white text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none motion-safe:transition-all resize-none"
+      class={`${fieldClass} resize-none`}
     ></textarea>
   </label>
 
   <button
     type="submit"
-    class="group relative inline-flex items-center justify-center gap-2 h-12 px-8 rounded-button bg-linear-to-br from-brand-600 to-brand-700 text-white font-semibold shadow-lg shadow-brand-600/20 hover:shadow-xl hover:shadow-brand-600/30 hover:-translate-y-0.5 active:translate-y-0 motion-safe:transition-all duration-200 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
+    class="inline-flex h-11 items-center justify-center rounded-button bg-brand-600 px-6 font-semibold text-white hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
   >
-    <span
-      class="absolute inset-0 -translate-x-full group-hover:translate-x-full motion-safe:transition-transform duration-700 bg-linear-to-r from-transparent via-white/25 to-transparent"
-      aria-hidden="true"
-    ></span>
-    <span class="relative">{submitLabel}</span>
-    <svg class="relative w-4 h-4 motion-safe:transition-transform duration-200 group-hover:translate-x-1" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M2 8h12M9 3l5 5-5 5"/>
-    </svg>
+    {submitLabel}
   </button>
 </form>
