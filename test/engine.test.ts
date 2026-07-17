@@ -269,7 +269,7 @@ test("codey buildInvocation: always starts with exec + effort + json + git-check
   const args = codeyArgs({});
   expect(args[0]).toBe("exec");
   expect(args).toContain("-c");
-  expect(args[args.indexOf("-c") + 1]).toBe("model_reasoning_effort=xhigh");
+  expect(args[args.indexOf("-c") + 1]).toBe("model_reasoning_effort=medium");
   expect(args).toContain("--json");
   expect(args).toContain("--skip-git-repo-check");
 });
@@ -391,7 +391,7 @@ test("opencode buildInvocation: starts with run, flags first, prompt last", () =
   const args = opencodeArgs({});
   expect(args[0]).toBe("run");
   expect(args).toContain("--variant");
-  expect(args[args.indexOf("--variant") + 1]).toBe("max");
+  expect(args[args.indexOf("--variant") + 1]).toBe("medium");
   expect(args).toContain("--format");
   expect(args[args.indexOf("--format") + 1]).toBe("json");
   expect(args).toContain("--dangerously-skip-permissions");
