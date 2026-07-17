@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { buildSite, ensureBuiltDist, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
 import type { EngineKind } from "../engine/adapter.ts";
-import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
+import {
+  type EngineRunner,
+  engineFailureDetail,
+  engineFailureReason,
+  runEngine,
+} from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
 import { resolveModel } from "../engine/tiers.ts";
 import { profilesFromConfig } from "../playwright/screenshot.ts";
@@ -117,7 +122,10 @@ export async function runAudit(params: AuditParams): Promise<void> {
     log,
   });
   if (!review.ok) {
-    throw new UserError(`audit: AI review failed: ${engineFailureReason(review)}`);
+    throw new UserError(
+      `audit: AI review failed: ${engineFailureReason(review)}`,
+      engineFailureDetail(review),
+    );
   }
 
   // 4. Re-gate: the fix pass must still compile. This is the only hard gate.

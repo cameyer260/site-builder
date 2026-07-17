@@ -17,6 +17,7 @@ import {
   statusCounts,
   writeProfile,
 } from "../src/synthesize/profile.ts";
+import type { UserError } from "../src/util/errors.ts";
 import { createLogger } from "../src/util/log.ts";
 import { FAKE_ASSET_BYTES, fakeGenerateEngine } from "./fixtures/fake-generate-engine.ts";
 
@@ -428,6 +429,37 @@ test("runGenerate falls back to a Profile-derived Brief when the call omits brie
   const brief = readFileSync(join(paths.versionDir(1), ARTIFACTS_DIRNAME, "brief.md"), "utf8");
   expect(brief).toContain("Auto-derived");
   expect(brief).toContain("plumbing"); // industry pulled from the Profile
+});
+
+test("runGenerate surfaces what the build engine printed only to stderr", async () => {
+  const { paths, profile } = await setupClientContext();
+  const client = newClient("Tailored Co.", { docs: [], images: [], notes: "n" });
+
+  let caught: unknown;
+  try {
+    await runGenerate({
+      paths,
+      config,
+      version: 1,
+      client,
+      profile,
+      interactive: false,
+      log,
+      engine: fakeGenerateEngine({
+        failBuild: true,
+        buildStderrExcerpt: "Error: credit balance is too low to continue",
+      }),
+      buildSite: fakeBuildOk,
+    });
+  } catch (err) {
+    caught = err;
+  }
+  // The reason stays short — it's what markFailed persists into state.json...
+  expect((caught as Error)?.message).toContain("forced engine failure");
+  expect((caught as Error)?.message).not.toContain("credit balance");
+  // ...while the cause the engine reported *only* on stderr still reaches the
+  // operator, as the hint. Before the split this was dropped entirely here.
+  expect((caught as UserError)?.hint).toContain("credit balance is too low");
 });
 
 test("runGenerate fails the stage when the compile gate fails", async () => {

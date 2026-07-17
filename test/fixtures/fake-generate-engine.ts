@@ -22,13 +22,14 @@ const ok = (): EngineResult => ({
   events: [],
 });
 
-const fail = (): EngineResult => ({
+const fail = (stderrExcerpt?: string): EngineResult => ({
   ok: false,
   resultText: null,
   isError: true,
   exitCode: 1,
   events: [],
   error: "forced engine failure",
+  stderrExcerpt,
 });
 
 export interface FakeGenerateEngineOptions {
@@ -38,6 +39,8 @@ export interface FakeGenerateEngineOptions {
   skipBriefMd?: boolean;
   /** Make the Site build call report failure. */
   failBuild?: boolean;
+  /** `stderrExcerpt` attached to a forced build failure — a cause the engine printed only there. */
+  buildStderrExcerpt?: string;
   /** Don't write .site-builder/images.json (no stock slots declared). */
   skipImagesJson?: boolean;
   /** Override the images.json payload (default: one landscape hero slot). */
@@ -81,7 +84,7 @@ export function fakeGenerateEngine(options: FakeGenerateEngineOptions = {}): Eng
 
     if (opts.prompt.includes("building a production-quality marketing website")) {
       if (options.failBuild) {
-        return fail();
+        return fail(options.buildStderrExcerpt);
       }
       // Stand in for the model tailoring the Kit.
       mkdirSync(join(dir, "src", "data"), { recursive: true });

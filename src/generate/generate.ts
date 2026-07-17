@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { buildSite, type SiteBuilder } from "../astro/run.ts";
 import type { Config } from "../config/schema.ts";
 import type { EngineKind } from "../engine/adapter.ts";
-import { type EngineRunner, runEngine } from "../engine/runner.ts";
+import {
+  type EngineRunner,
+  engineFailureDetail,
+  engineFailureReason,
+  runEngine,
+} from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
 import { resolveModel } from "../engine/tiers.ts";
 import type { Client } from "../storage/client.ts";
@@ -139,7 +144,10 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
     log,
   });
   if (!build.ok) {
-    throw new UserError(`generate: Site build failed: ${build.error}`);
+    throw new UserError(
+      `generate: Site build failed: ${engineFailureReason(build)}`,
+      engineFailureDetail(build),
+    );
   }
 
   // 5. Materialize the stock image slots the build declared (Pexels → fallback).

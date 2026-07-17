@@ -6,6 +6,7 @@ import { ADAPTERS, errorEventDetail } from "../src/engine/adapter.ts";
 import {
   buildEngineArgs,
   type EngineOptions,
+  engineFailureDetail,
   engineFailureReason,
   interpretResult,
   parseStreamJson,
@@ -102,21 +103,40 @@ test("interpretResult: no result event is a failure", () => {
   expect(r.error).toContain("no result event");
 });
 
-test("engineFailureReason: appends the stderr excerpt when the engine only printed there", () => {
+test("interpretResult: an erroring result event carries the engine's own text, not a bare verdict", () => {
+  // Where claudey puts the *why* (auth, credit balance, a refusal): the result
+  // event's own `result` field. A bare "engine reported an error" loses it.
+  const r = interpretResult({
+    events: [
+      ev({ type: "result", is_error: true, result: "Credit balance is too low to continue" }),
+    ],
+    exitCode: 0,
+  });
+  expect(r.ok).toBe(false);
+  expect(r.error).toContain("Credit balance is too low");
+});
+
+test("interpretResult: an erroring result event with no text falls back to the verdict", () => {
+  const r = interpretResult({ events: [ev({ type: "result", is_error: true })], exitCode: 0 });
+  expect(r.ok).toBe(false);
+  expect(r.error).toBe("engine reported an error");
+});
+
+test("engineFailureReason: stays a short one-liner, with stderr split into the detail", () => {
   // The real failure mode: no result event, exit 1, the cause on stderr only.
+  // The reason is what lands in state.json, so the excerpt must not be inlined.
   const r = interpretResult({
     events: [],
     exitCode: 1,
     stderrExcerpt: "Error: Input must be provided either through stdin or as a prompt argument\n",
   });
-  const reason = engineFailureReason(r);
-  expect(reason).toContain("engine exited 1 with no result event");
-  expect(reason).toContain("stdin");
+  expect(engineFailureReason(r)).toBe("engine exited 1 with no result event");
+  expect(engineFailureDetail(r)).toContain("stdin");
 });
 
-test("engineFailureReason: omits the stderr clause when stderr is empty", () => {
+test("engineFailureDetail: is undefined when the engine printed no stderr", () => {
   const r = interpretResult({ events: [], exitCode: 1, stderrExcerpt: "  " });
-  expect(engineFailureReason(r)).toBe("engine exited 1 with no result event");
+  expect(engineFailureDetail(r)).toBeUndefined();
 });
 
 test("interpretResult: spawn error short-circuits", () => {
@@ -176,7 +196,7 @@ test("runEngine: a repeating stderr error keeps the causal first line, not just 
   const result = await runEngine(FAKE_ENGINE, { prompt: "STDERR_SPAM", cwd: dir });
   expect(result.ok).toBe(false);
   // A tail-only window would have this pushed out by the trailing spam.
-  expect(engineFailureReason(result)).toContain("FATAL: root cause line");
+  expect(engineFailureDetail(result)).toContain("FATAL: root cause line");
 }, 20_000);
 
 test("runEngine: an identically-repeating stderr stanza is collapsed, not spammed verbatim", async () => {

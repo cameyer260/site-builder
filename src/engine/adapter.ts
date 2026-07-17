@@ -137,16 +137,35 @@ const claudeyAdapter: EngineAdapter = {
       exitCode,
       events,
       stderrExcerpt,
-      error: ok
-        ? undefined
-        : resultEvent.subtype && resultEvent.subtype !== "success"
-          ? `engine result subtype "${resultEvent.subtype}"`
-          : "engine reported an error",
+      error: ok ? undefined : claudeyErrorText(resultEvent),
     };
   },
 
   watchesRateLimit: true,
 };
+
+/**
+ * The failure reason for an erroring claudey result event. The verdict itself
+ * (`is_error` / a non-success subtype) says only *that* it failed; when the
+ * engine has something to say about *why* — an auth failure, an exhausted credit
+ * balance, a refusal — it puts it in the result event's own `result` field, the
+ * same slot a successful run uses for its answer. That text is often the only
+ * record of the cause (nothing reaches stderr), so it's folded into the reason
+ * rather than left behind in `resultText`. See ADR-0014.
+ */
+function claudeyErrorText(resultEvent: ResultEvent): string {
+  const verdict =
+    resultEvent.subtype && resultEvent.subtype !== "success"
+      ? `engine result subtype "${resultEvent.subtype}"`
+      : "engine reported an error";
+  const detail = asString(resultEvent.result);
+  if (detail === undefined) {
+    return verdict;
+  }
+  const capped =
+    detail.length > ERROR_DETAIL_CAP ? `${detail.slice(0, ERROR_DETAIL_CAP)}…` : detail;
+  return `${verdict}: ${capped}`;
+}
 
 // ---------------------------------------------------------------------------
 // codey adapter (Codex — `codex exec`)

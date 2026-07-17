@@ -507,18 +507,44 @@ export function runEngine(engineBin: string, opts: EngineOptions): Promise<Engin
 }
 
 /**
- * A human-facing failure reason for a non-ok engine run: the interpreted error
- * plus the stderr excerpt when present. Stage failures route through this so a
- * crash the engine printed only to stderr — never to the stream-json result
- * event (e.g. a `claudey` wrapper not forwarding stdin, or an auth error) — is
- * surfaced instead of silently dropped. See ADR-0001. Doesn't re-truncate the
- * excerpt: `composeStderrExcerpt` already bounded it, and slicing from the end
- * again would cut off exactly the causal first line it was built to keep.
+ * The short, human-facing failure reason for a non-ok engine run: the
+ * interpreted error alone, one line. Safe as a stage's UserError *message*,
+ * which `markFailed` persists into `state.json` and every warn line prints
+ * verbatim. The bulky diagnostics are {@link engineFailureDetail}'s job — the
+ * two are deliberately split so a kilobyte of engine stderr can reach the
+ * operator without also being written into state or stacked onto a warning.
  */
 export function engineFailureReason(result: EngineResult): string {
-  const reason = result.error ?? "engine failed with no result";
+  return result.error ?? "engine failed with no result";
+}
+
+/**
+ * The bulky diagnostic for a non-ok engine run — what the engine printed to
+ * stderr — or undefined when it printed nothing. Stage failures pass this as the
+ * UserError *hint* so a crash the engine reported only on stderr, never in its
+ * result event (e.g. a `claudey` wrapper not forwarding stdin, or an auth
+ * error), is surfaced instead of silently dropped. See ADR-0001. Doesn't
+ * re-truncate the excerpt: `composeStderrExcerpt` already bounded it, and
+ * slicing from the end again would cut off exactly the causal first line it was
+ * built to keep.
+ */
+export function engineFailureDetail(result: EngineResult): string | undefined {
   const excerpt = result.stderrExcerpt?.trim();
-  return excerpt ? `${reason} (stderr: ${excerpt})` : reason;
+  return excerpt ? `engine stderr:\n${excerpt}` : undefined;
+}
+
+/**
+ * Tees an engine failure's detail to the log at info level, under `label`.
+ * For the best-effort calls (asset classification, the Design Brief) that warn
+ * and carry on with a fallback: the warning stays one readable line while the
+ * diagnostic still lands in the build log. Stage-fatal calls don't use this —
+ * they pass the detail as a UserError hint, which reaches the console.
+ */
+export function logEngineFailureDetail(result: EngineResult, log: Logger, label: string): void {
+  const detail = engineFailureDetail(result);
+  if (detail) {
+    log.info(`${label}: ${detail}`);
+  }
 }
 
 /**

@@ -2,7 +2,13 @@ import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "../config/schema.ts";
 import type { EngineKind } from "../engine/adapter.ts";
-import { type EngineRunner, engineFailureReason, runEngine } from "../engine/runner.ts";
+import {
+  type EngineRunner,
+  engineFailureDetail,
+  engineFailureReason,
+  logEngineFailureDetail,
+  runEngine,
+} from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
 import { resolveModel } from "../engine/tiers.ts";
 import type { IngestManifest } from "../ingest/manifest.ts";
@@ -101,16 +107,17 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
         // engine noise ever needs diagnosing) goes to the build log at info
         // level instead of stacking onto the warning.
         log.warn(
-          `synthesize: asset classification engine reported an error (${result.error ?? "unknown error"}) but wrote a valid assets.json; using it anyway`,
+          `synthesize: asset classification engine reported an error (${engineFailureReason(result)}) but wrote a valid assets.json; using it anyway`,
         );
-        if (result.stderrExcerpt?.trim()) {
-          log.info(`synthesize: asset classification stderr — ${result.stderrExcerpt.trim()}`);
-        }
+        logEngineFailureDetail(result, log, "synthesize: asset classification");
       }
     } else {
       log.warn(
         `synthesize: asset classification unavailable (${result.ok ? "no valid assets.json" : engineFailureReason(result)}); using fallbacks`,
       );
+      if (!result.ok) {
+        logEngineFailureDetail(result, log, "synthesize: asset classification");
+      }
     }
   } else {
     log.step("synthesize: no captured assets to classify");
@@ -144,6 +151,7 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
   if (!profileResult.ok) {
     throw new UserError(
       `synthesize: profile synthesis failed: ${engineFailureReason(profileResult)}`,
+      engineFailureDetail(profileResult),
     );
   }
 
