@@ -7,8 +7,8 @@ import type { EngineKind } from "../engine/adapter.ts";
  *
  * Schema bump (ADR-0010): `engineBin`/`models` replaced by `defaultEngine`/
  * `engines`. Old keys are silently stripped by Zod (strip mode); new keys are
- * defaulted from DEFAULTS so an existing config.json keeps loading unchanged.
- * Re-run `sb config` to persist the new shape.
+ * defaulted from ENGINE_DEFAULTS so an existing config.json keeps loading
+ * unchanged. Re-run `sb config` to persist the new shape.
  */
 
 export const ViewportsSchema = z.object({
@@ -47,6 +47,39 @@ export const EngineProfileSchema = z.object({
 });
 export type EngineProfile = z.infer<typeof EngineProfileSchema>;
 
+/**
+ * The single source of truth for each Engine's reference bin + models. Used
+ * both as the Zod fallback when an existing config.json predates the
+ * `engines` key (ADR-0010) and as the exported DEFAULTS the `sb config`
+ * wizard pre-fills from — one literal instead of two hand-kept-in-sync copies.
+ */
+const ENGINE_DEFAULTS: Record<EngineKind, EngineProfile> = {
+  claudey: {
+    bin: "claudey",
+    models: { best: "claude-opus-4-8", small: "claude-sonnet-5" },
+    modelRoles: {},
+  },
+  codey: {
+    bin: "codey",
+    models: { best: "gpt-5.6-sol", small: "gpt-5.6-terra" },
+    modelRoles: {},
+  },
+  opencode: {
+    bin: "opencode",
+    // Base tiers are multimodal so the vision roles work by default: `small`
+    // (classify) and `best` (audit). The text-only roles are routed below to
+    // cheaper text models — DeepSeek/GLM have no vision, hence the split.
+    models: {
+      best: "openrouter/google/gemini-3.1-pro-preview",
+      small: "openrouter/google/gemini-3-flash-preview",
+    },
+    modelRoles: {
+      code: "openrouter/z-ai/glm-5.2",
+      reason: "openrouter/deepseek/deepseek-v4-pro",
+    },
+  },
+};
+
 export const ConfigSchema = z.object({
   /** The single Root directory under which every Client folder lives. */
   root: z.string().min(1),
@@ -59,32 +92,7 @@ export const ConfigSchema = z.object({
       codey: EngineProfileSchema,
       opencode: EngineProfileSchema,
     })
-    .default({
-      claudey: {
-        bin: "claudey",
-        models: { best: "claude-opus-4-8", small: "claude-sonnet-5" },
-        modelRoles: {},
-      },
-      codey: {
-        bin: "codey",
-        models: { best: "gpt-5.5", small: "gpt-5.4-mini" },
-        modelRoles: {},
-      },
-      opencode: {
-        bin: "opencode",
-        // Base tiers are multimodal so the vision roles work by default: `small`
-        // (classify) and `best` (audit). The text-only roles are routed below to
-        // cheaper text models — DeepSeek/GLM have no vision, hence the split.
-        models: {
-          best: "openrouter/google/gemini-3.1-pro-preview",
-          small: "openrouter/google/gemini-3-flash-preview",
-        },
-        modelRoles: {
-          code: "openrouter/z-ai/glm-5.2",
-          reason: "openrouter/deepseek/deepseek-v4-pro",
-        },
-      },
-    }),
+    .default(ENGINE_DEFAULTS),
   /** The Cloudflare deploy binary. */
   wranglerBin: z.string().min(1).default("wrangler"),
   /**
@@ -109,29 +117,7 @@ export type Config = z.infer<typeof ConfigSchema>;
 /** Everything except the user-chosen Root, which has no sensible default. */
 export const DEFAULTS: Omit<Config, "root" | "pexelsApiKey"> = {
   defaultEngine: "claudey" as EngineKind,
-  engines: {
-    claudey: {
-      bin: "claudey",
-      models: { best: "claude-opus-4-8", small: "claude-sonnet-5" },
-      modelRoles: {},
-    },
-    codey: {
-      bin: "codey",
-      models: { best: "gpt-5.5", small: "gpt-5.4-mini" },
-      modelRoles: {},
-    },
-    opencode: {
-      bin: "opencode",
-      models: {
-        best: "openrouter/google/gemini-3.1-pro-preview",
-        small: "openrouter/google/gemini-3-flash-preview",
-      },
-      modelRoles: {
-        code: "openrouter/z-ai/glm-5.2",
-        reason: "openrouter/deepseek/deepseek-v4-pro",
-      },
-    },
-  },
+  engines: ENGINE_DEFAULTS,
   wranglerBin: "wrangler",
   ghBin: "gh",
   viewports: { desktop: 1440, mobile: 390 },
