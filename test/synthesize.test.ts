@@ -232,6 +232,9 @@ test("looksLikeDerivativeSuffix recognizes size/crop tokens, dimensions, and cac
   expect(looksLikeDerivativeSuffix("final")).toBe(false);
   // All-letter slug, even 20+ chars long, is a content word, not a hash.
   expect(looksLikeDerivativeSuffix("fullcolorreversedversion")).toBe(false);
+  // An NxN fragment embedded in a longer content tail is not a dimension
+  // token — only a tail that is ENTIRELY WxH counts (unanchored regex bug).
+  expect(looksLikeDerivativeSuffix("3x5-postcard")).toBe(false);
 });
 
 /**
@@ -307,6 +310,10 @@ test("content words and distinct uploads are NOT folded together", () => {
   // A distinct upload with an all-letter descriptive slug (24 chars, no digits)
   // must NOT be folded into the bare original as if it were a cache-bust hash.
   expect(sameIdentity("logo.png", "logo-fullcolorreversedversion.png")).toBe(false);
+  // A genuinely distinct image whose content tail happens to contain an NxN
+  // fragment (e.g. "3x5" as part of "3x5-postcard") must not be folded into
+  // the bare original as if "3x5-postcard" were a WxH dimension suffix.
+  expect(sameIdentity("banner.jpg", "banner-3x5-postcard.jpg")).toBe(false);
   // Real cache-bust hashes mix letters and digits and must still fold.
   expect(
     sameIdentity(
