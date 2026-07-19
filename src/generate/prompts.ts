@@ -10,17 +10,15 @@ import { capturedAssetPath } from "./assets.ts";
  * model communicates by writing on-disk artifacts, not by returning prose.
  */
 
-/** Thin orchestration directives appended to the system prompt for the build call. */
+/**
+ * Thin orchestration directive appended to the system prompt for the build call.
+ * Everything else (Kit handling, source of truth, design intelligence) is already
+ * covered, more specifically, by `buildGeneratePrompt` itself — kept here only as
+ * a fallback framing and the one hard output-contract rule.
+ */
 export const GENERATE_SYSTEM_PROMPT = [
   "You are the `generate` stage of the Site Builder pipeline.",
-  "Build on the provided Astro Kit — never scaffold a project from scratch.",
-  "The Design Brief and Client Profile are the source of truth.",
-  "Obtain design intelligence (palettes, font pairings, styles, and the",
-  "accessibility/performance/typography guardrails) from the `ui-ux-pro-max`",
-  "skill rather than re-deriving it.",
-  "The Kit is a quality floor and a parts box, not a template to reproduce —",
-  "compose a site whose look is distinctive to this Client.",
-  "Produce results only by writing files in the project; do not print explanations.",
+  "Communicate only by writing/editing files in the project; never print explanations or summaries.",
 ].join(" ");
 
 export interface BriefPromptInput {
@@ -216,10 +214,8 @@ export function buildGeneratePrompt(input: GeneratePromptInput): string {
     "",
     "Constraints:",
     "- Do NOT run `npm`, `astro build`, or `astro dev` — the pipeline runs the gate.",
-    "- Preserve the Kit's quality floor: one <header>/<main>/<footer>, the skip link,",
-    "  title/description/canonical/OG/JSON-LD meta, visible focus states, and the",
+    "- Preserve the floor described above, plus visible focus states and the",
     "  reduced-motion rules.",
-    "- Keep TypeScript and Astro happy (no broken imports). Communicate only by",
-    "  editing files; do not print a summary.",
+    "- Keep TypeScript and Astro happy (no broken imports).",
   ].join("\n");
 }
