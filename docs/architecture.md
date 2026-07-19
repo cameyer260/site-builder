@@ -149,10 +149,13 @@ Each is a thin adapter over a domain module:
   per Viewport Profile, asset download (`<img>` + `og:image` + favicons), document
   extraction (`unpdf`/`mammoth`/txt/md), and `--notes`, normalized into `ingest/`.
   Pure code.
-- **`synthesize`** (`src/synthesize/`) — engine call A classifies + renames image
-  Assets (`classify` role — cheap vision, ADR-0014's artifact-trust); engine call B
-  writes the Client Profile (`profile.md` + `profile.json` field statuses) and a
-  "what we still need to know" Checklist (`reason` role).
+- **`synthesize`** (`src/synthesize/`) — `dedupeCandidates` (`assets.ts`, ADR-0016)
+  deterministically collapses near-identical asset candidates (byte-hash matches,
+  WordPress size/crop derivative grouping, a tracking-pixel size floor) before
+  engine call A classifies + renames the survivors into image Assets (`classify`
+  role — cheap vision, ADR-0014's artifact-trust); engine call B writes the Client
+  Profile (`profile.md` + `profile.json` field statuses) and a "what we still need
+  to know" Checklist (`reason` role).
 - **`generate`** (`src/generate/`, ADR-0005/0006) — copies the [Kit](kit.md) into
   `sites/vN/`, stages every Profile Asset into `src/assets/captured/`
   (`assets.ts`, ADR-0011 — which Assets to keep was already decided in

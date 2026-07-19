@@ -20,6 +20,7 @@ import { nowIso } from "../util/time.ts";
 import {
   type AssetClassification,
   candidateAssets,
+  dedupeCandidates,
   readClassification,
   reconcileAssets,
 } from "./assets.ts";
@@ -40,9 +41,16 @@ import { buildAssetPrompt, buildProfilePrompt } from "./prompts.ts";
  * the Checklist gaps. Owns `context/`.
  */
 
-const ASSET_BUDGET_USD = 1.0;
-const PROFILE_BUDGET_USD = 1.5;
-const CALL_TIMEOUT_MS = 300_000;
+// Sized for asset-heavy Clients (100+ captured images, dozens of crawled
+// pages): both calls were previously capped at $1-1.5 / 5min, well below every
+// other AI stage (generate: $10/40min, audit: $6/20min). A session that
+// crosses --max-budget-usd wraps up gracefully rather than erroring — it
+// still reports a clean `result:success`, just without finishing the
+// required Write — so an undersized cap here reads as a silent "engine
+// succeeded but wrote nothing" failure instead of a budget error.
+const ASSET_BUDGET_USD = 3.0;
+const PROFILE_BUDGET_USD = 4.0;
+const CALL_TIMEOUT_MS = 900_000;
 
 export interface SynthesizeParams {
   paths: ClientPaths;
@@ -77,13 +85,23 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
 
   // --- Call A: asset classification (vision) -> reconciled asset manifest ----
   const candidates = candidateAssets(manifest, paths.ingest);
+  // Collapse WordPress-style derivative multiplication (same original served at
+  // many registered sizes/theme crops) down to one representative per original
+  // before it ever reaches the classification call (ADR-0016).
+  const deduped = dedupeCandidates(candidates);
+  if (deduped.length < candidates.length) {
+    log.step(
+      `synthesize: deduped ${candidates.length} candidate asset(s) → ${deduped.length} ` +
+        `(${candidates.length - deduped.length} duplicate/derivative/undersized)`,
+    );
+  }
   let classification: AssetClassification = { assets: [] };
-  if (candidates.length > 0) {
-    log.step(`synthesize: classifying ${candidates.length} captured asset(s)`);
+  if (deduped.length > 0) {
+    log.step(`synthesize: classifying ${deduped.length} captured asset(s)`);
     const result = await engine(engineBin, {
       ...defaults,
       engine: engineKind,
-      prompt: buildAssetPrompt({ contextDir, candidates }),
+      prompt: buildAssetPrompt({ contextDir, candidates: deduped }),
       cwd: contextDir,
       addDirs: sharedDirs,
       model: modelFor("assetClassification"),
@@ -124,7 +142,7 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
   }
   const assets = reconcileAssets({
     classification,
-    candidates,
+    candidates: deduped,
     contextDir,
     clientName: client.name,
     log,
