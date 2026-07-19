@@ -174,8 +174,8 @@ const DERIVATIVE_TOKENS = new Set([
 ]);
 
 const DIMENSION_TOKEN = /\d+x\d+/i;
-/** An opaque cache-bust / image-optimization hash appended to a filename. */
-const OPAQUE_HASH_TOKEN = /^[a-z0-9]{20,}$/i;
+/** An opaque cache-bust / image-optimization hash appended to a filename (mixed letters+digits). */
+const OPAQUE_HASH_TOKEN = /^(?=.*[a-z])(?=.*\d)[a-z0-9]{20,}$/i;
 
 /**
  * True when `rest` — the hyphen-delimited tail after a bare original's

@@ -230,6 +230,8 @@ test("looksLikeDerivativeSuffix recognizes size/crop tokens, dimensions, and cac
   expect(looksLikeDerivativeSuffix("left")).toBe(false);
   expect(looksLikeDerivativeSuffix("2")).toBe(false);
   expect(looksLikeDerivativeSuffix("final")).toBe(false);
+  // All-letter slug, even 20+ chars long, is a content word, not a hash.
+  expect(looksLikeDerivativeSuffix("fullcolorreversedversion")).toBe(false);
 });
 
 /**
@@ -302,6 +304,16 @@ test("content words and distinct uploads are NOT folded together", () => {
   expect(
     sameIdentity("AdobeStock_383075787_30-1-768x519.jpeg", "AdobeStock_383075787_30-600x600.jpeg"),
   ).toBe(false);
+  // A distinct upload with an all-letter descriptive slug (24 chars, no digits)
+  // must NOT be folded into the bare original as if it were a cache-bust hash.
+  expect(sameIdentity("logo.png", "logo-fullcolorreversedversion.png")).toBe(false);
+  // Real cache-bust hashes mix letters and digits and must still fold.
+  expect(
+    sameIdentity(
+      "Pioneer-Logo.webp",
+      "Pioneer-Logo-qicxenrkktrdap0uc1o4yh8ufz5n32g7c3yc411p28.webp",
+    ),
+  ).toBe(true);
 });
 
 // ---- dedupeCandidates integration (fs) -------------------------------------
