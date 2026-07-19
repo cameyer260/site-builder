@@ -10,7 +10,7 @@ import {
   runEngine,
 } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
-import { resolveModel } from "../engine/tiers.ts";
+import { resolveEffort, resolveModel } from "../engine/tiers.ts";
 import type { IngestManifest } from "../ingest/manifest.ts";
 import type { Client } from "../storage/client.ts";
 import type { ClientPaths } from "../storage/layout.ts";
@@ -56,6 +56,7 @@ export interface SynthesizeParams {
   engineKind?: EngineKind;
   engineBin?: string;
   modelFor?: (stage: string) => string;
+  effortFor?: (stage: string) => string;
 }
 
 export async function runSynthesize(params: SynthesizeParams): Promise<Profile> {
@@ -68,6 +69,7 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
   const engineProfile = config.engines[engineKind];
   const engineBin = params.engineBin ?? engineProfile.bin;
   const modelFor = params.modelFor ?? ((stage: string) => resolveModel(engineProfile, stage));
+  const effortFor = params.effortFor ?? ((stage: string) => resolveEffort(engineProfile, stage));
 
   const contextDir = paths.context;
   mkdirSync(contextDir, { recursive: true });
@@ -87,6 +89,7 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
       cwd: contextDir,
       addDirs: sharedDirs,
       model: modelFor("assetClassification"),
+      effort: effortFor("assetClassification"),
       maxBudgetUsd: ASSET_BUDGET_USD,
       timeoutMs: CALL_TIMEOUT_MS,
       log,
@@ -144,6 +147,7 @@ export async function runSynthesize(params: SynthesizeParams): Promise<Profile> 
     cwd: contextDir,
     addDirs: sharedDirs,
     model: modelFor("synthesize"),
+    effort: effortFor("synthesize"),
     maxBudgetUsd: PROFILE_BUDGET_USD,
     timeoutMs: CALL_TIMEOUT_MS,
     log,

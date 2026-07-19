@@ -21,6 +21,7 @@ Commands:
   config get <key>       Print a config value
   config set <key> <v>   Update a config value
   config doctor          Check the environment (engine, wrangler, gh, root, keys)
+  config fix             Repair invalid/missing keys against code defaults
   config path            Print the config file path
 
   build <client> …       Create a Client and run the full pipeline, or smartly

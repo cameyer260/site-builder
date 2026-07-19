@@ -10,7 +10,7 @@ import {
   runEngine,
 } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
-import { resolveModel } from "../engine/tiers.ts";
+import { resolveEffort, resolveModel } from "../engine/tiers.ts";
 import type { Client } from "../storage/client.ts";
 import { type ClientPaths, isVersionBuilt, versionMarkerPath } from "../storage/layout.ts";
 import type { Profile } from "../synthesize/profile.ts";
@@ -67,6 +67,7 @@ export interface GenerateParams {
   engineKind?: EngineKind;
   engineBin?: string;
   modelFor?: (stage: string) => string;
+  effortFor?: (stage: string) => string;
 }
 
 export async function runGenerate(params: GenerateParams): Promise<void> {
@@ -79,6 +80,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
   const engineProfile = config.engines[engineKind];
   const engineBin = params.engineBin ?? engineProfile.bin;
   const modelFor = params.modelFor ?? ((stage: string) => resolveModel(engineProfile, stage));
+  const effortFor = params.effortFor ?? ((stage: string) => resolveEffort(engineProfile, stage));
 
   const versionDir = params.paths.versionDir(version);
 
@@ -120,6 +122,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
     engineKind,
     engineBin,
     modelFor,
+    effortFor,
   });
 
   // 4. The main AI build on top of the Kit.
@@ -139,6 +142,7 @@ export async function runGenerate(params: GenerateParams): Promise<void> {
     addDirs: [paths.context, paths.ingest],
     appendSystemPrompt: GENERATE_SYSTEM_PROMPT,
     model: modelFor("generate"),
+    effort: effortFor("generate"),
     maxBudgetUsd: GENERATE_BUDGET_USD,
     timeoutMs: GENERATE_TIMEOUT_MS,
     log,

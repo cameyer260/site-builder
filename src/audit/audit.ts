@@ -10,7 +10,7 @@ import {
   runEngine,
 } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
-import { resolveModel } from "../engine/tiers.ts";
+import { resolveEffort, resolveModel } from "../engine/tiers.ts";
 import { profilesFromConfig } from "../playwright/screenshot.ts";
 import type { Client } from "../storage/client.ts";
 import { ARTIFACTS_DIRNAME, type ClientPaths } from "../storage/layout.ts";
@@ -58,6 +58,7 @@ export interface AuditParams {
   engineKind?: EngineKind;
   engineBin?: string;
   modelFor?: (stage: string) => string;
+  effortFor?: (stage: string) => string;
 }
 
 export async function runAudit(params: AuditParams): Promise<void> {
@@ -70,6 +71,7 @@ export async function runAudit(params: AuditParams): Promise<void> {
   const engineProfile = config.engines[engineKind];
   const engineBin = params.engineBin ?? engineProfile.bin;
   const modelFor = params.modelFor ?? ((stage: string) => resolveModel(engineProfile, stage));
+  const effortFor = params.effortFor ?? ((stage: string) => resolveEffort(engineProfile, stage));
   const inspect = params.inspect ?? inspectBuiltSite;
   const lighthouse = params.lighthouse ?? runLighthouseScorecard;
 
@@ -117,6 +119,7 @@ export async function runAudit(params: AuditParams): Promise<void> {
     addDirs: [paths.context],
     appendSystemPrompt: AUDIT_SYSTEM_PROMPT,
     model: modelFor("audit"),
+    effort: effortFor("audit"),
     maxBudgetUsd: AUDIT_BUDGET_USD,
     timeoutMs: AUDIT_TIMEOUT_MS,
     log,

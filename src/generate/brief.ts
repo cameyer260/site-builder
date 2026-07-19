@@ -9,7 +9,7 @@ import {
   runEngine,
 } from "../engine/runner.ts";
 import { stageEngineDefaults } from "../engine/stage.ts";
-import { resolveModel } from "../engine/tiers.ts";
+import { resolveEffort, resolveModel } from "../engine/tiers.ts";
 import type { ClientPaths } from "../storage/layout.ts";
 import { displayFieldValue, type Profile } from "../synthesize/profile.ts";
 import type { Logger } from "../util/log.ts";
@@ -42,6 +42,7 @@ export interface DeriveBriefParams {
   engineKind?: EngineKind;
   engineBin?: string;
   modelFor?: (stage: string) => string;
+  effortFor?: (stage: string) => string;
 }
 
 export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
@@ -53,6 +54,7 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
   const engineProfile = config.engines[engineKind];
   const engineBin = params.engineBin ?? engineProfile.bin;
   const modelFor = params.modelFor ?? ((stage: string) => resolveModel(engineProfile, stage));
+  const effortFor = params.effortFor ?? ((stage: string) => resolveEffort(engineProfile, stage));
 
   const versionDir = paths.versionDir(version);
   const briefMdPath = join(artifactsDir(versionDir), "brief.md");
@@ -80,6 +82,7 @@ export async function deriveBrief(params: DeriveBriefParams): Promise<void> {
     // Brief is the `classify` role (cheap vision) — it opens the logo + existing-
     // site screenshots — and is a sub-call of generate, not a stage of its own.
     model: modelFor("brief"),
+    effort: effortFor("brief"),
     maxBudgetUsd: BRIEF_BUDGET_USD,
     timeoutMs: BRIEF_TIMEOUT_MS,
     log,

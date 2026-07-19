@@ -4,6 +4,7 @@ import { isAbsolute, resolve } from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { runDoctor } from "../config/doctor.ts";
+import { fixConfig } from "../config/fix.ts";
 import { type Config, DEFAULTS } from "../config/schema.ts";
 import {
   CONFIG_KEYS,
@@ -133,16 +134,23 @@ async function interactiveSetup(): Promise<number> {
         bin: claudeyBin.trim() || DEFAULTS.engines.claudey.bin,
         models: existing?.engines.claudey.models ?? DEFAULTS.engines.claudey.models,
         modelRoles: existing?.engines.claudey.modelRoles ?? DEFAULTS.engines.claudey.modelRoles,
+        effort: existing?.engines.claudey.effort ?? DEFAULTS.engines.claudey.effort,
+        effortRoles: existing?.engines.claudey.effortRoles ?? DEFAULTS.engines.claudey.effortRoles,
       },
       codey: {
         bin: codeyBin.trim() || DEFAULTS.engines.codey.bin,
         models: existing?.engines.codey.models ?? DEFAULTS.engines.codey.models,
         modelRoles: existing?.engines.codey.modelRoles ?? DEFAULTS.engines.codey.modelRoles,
+        effort: existing?.engines.codey.effort ?? DEFAULTS.engines.codey.effort,
+        effortRoles: existing?.engines.codey.effortRoles ?? DEFAULTS.engines.codey.effortRoles,
       },
       opencode: {
         bin: opencodeBin.trim() || DEFAULTS.engines.opencode.bin,
         models: existing?.engines.opencode.models ?? DEFAULTS.engines.opencode.models,
         modelRoles: existing?.engines.opencode.modelRoles ?? DEFAULTS.engines.opencode.modelRoles,
+        effort: existing?.engines.opencode.effort ?? DEFAULTS.engines.opencode.effort,
+        effortRoles:
+          existing?.engines.opencode.effortRoles ?? DEFAULTS.engines.opencode.effortRoles,
       },
     },
     wranglerBin: wranglerBin.trim() || DEFAULTS.wranglerBin,
@@ -196,6 +204,36 @@ function setSubcommand(key: string | undefined, valueParts: string[]): number {
   return 0;
 }
 
+function formatValue(v: unknown): string {
+  if (v === undefined) {
+    return pc.dim("(unset)");
+  }
+  return typeof v === "string" ? v : JSON.stringify(v);
+}
+
+function fixSubcommand(): number {
+  const result = fixConfig();
+  if (result.changes.length === 0) {
+    console.log(pc.green("✓ config is already valid — no changes made"));
+  } else {
+    console.log(pc.bold(`repaired ${result.changes.length} key(s):`));
+    for (const c of result.changes) {
+      console.log(`  ${c.key}: ${formatValue(c.from)} ${pc.dim("→")} ${formatValue(c.to)}`);
+    }
+  }
+  if (result.rootMissing) {
+    console.error(
+      pc.red(
+        `\n✗ root is ${result.rootValue === undefined ? "unset" : `invalid (${JSON.stringify(result.rootValue)})`} — could not save`,
+      ),
+    );
+    console.error("run `sb config set root <path>` or `sb config` to finish repairing it");
+    return 1;
+  }
+  console.log(pc.green(`\n✓ saved ${configPath()}`));
+  return 0;
+}
+
 function doctorSubcommand(): number {
   const config = loadConfigOrThrow();
   const results = runDoctor(config);
@@ -222,13 +260,15 @@ export async function configCommand(args: string[]): Promise<number> {
       return setSubcommand(rest[0], rest.slice(1));
     case "doctor":
       return doctorSubcommand();
+    case "fix":
+      return fixSubcommand();
     case "path":
       console.log(configPath());
       return 0;
     default:
       throw new UserError(
         `unknown config subcommand: ${sub}`,
-        "expected: get, set, doctor, path — or no subcommand for interactive setup",
+        "expected: get, set, doctor, fix, path — or no subcommand for interactive setup",
       );
   }
 }

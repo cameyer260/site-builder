@@ -57,6 +57,12 @@ export interface EngineOptions {
   engine?: EngineKind;
   /** Model alias ("opus"/"sonnet") or full id ("claude-opus-4-8"). */
   model?: string;
+  /**
+   * Reasoning-effort value passed to the Engine CLI (claudey's `--effort`,
+   * codey's `model_reasoning_effort`, opencode's `--variant`). Defaults to
+   * `"medium"` when unset, matching each adapter's prior hardcoded value.
+   */
+  effort?: string;
   /** Extra directories the engine may read/write (`--add-dir`). */
   addDirs?: string[];
   /** Tool-orchestration directives appended to the system prompt (claudey) or prepended to the prompt (codey/opencode). */

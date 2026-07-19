@@ -122,14 +122,18 @@ domain vocabulary, **[CONTEXT.md](CONTEXT.md)**.
 | `sb config doctor` | Check the environment: engine, wrangler (present + authed), root, `gh`, Pexels key. Exit 1 if a **required** check fails. |
 | `sb config get <key>` | Print one config value. |
 | `sb config set <key> <value>` | Update one config value (re-validated). |
+| `sb config fix` | Repair invalid/missing keys against code defaults, field by field — useful after an upgrade changes a model id, or to recover from hand-edited JSON. Leaves valid keys untouched; only `root` (no sensible default) is left for you to set if it's missing. |
 | `sb config path` | Print the config file path. |
 
 Settable keys: `root`, `defaultEngine`, `engines.claudey.bin`,
 `engines.claudey.models.best`, `engines.claudey.models.small`,
-`engines.codey.bin`, `engines.codey.models.best`, `engines.codey.models.small`,
-`engines.opencode.bin`, `engines.opencode.models.best`,
-`engines.opencode.models.small`, `wranglerBin`, `ghBin`, `pexelsApiKey`,
-`viewports.desktop`, `viewports.mobile`, `pageCap`.
+`engines.claudey.effort`, `engines.codey.bin`, `engines.codey.models.best`,
+`engines.codey.models.small`, `engines.codey.effort`, `engines.opencode.bin`,
+`engines.opencode.models.best`, `engines.opencode.models.small`,
+`engines.opencode.effort`, `wranglerBin`, `ghBin`, `pexelsApiKey`,
+`viewports.desktop`, `viewports.mobile`, `pageCap`. Per-role model/effort
+overrides (`engines.<kind>.modelRoles.<role>` /
+`engines.<kind>.effortRoles.<role>`) are also settable — see below.
 
 ### `build` — the smart verb
 
@@ -367,14 +371,17 @@ it.
 | `engines.claudey.bin` | `claudey` | Binary for the claudey engine. |
 | `engines.claudey.models.best` | `claude-opus-4-8` | Base best tier → `code` + `reason` + `audit` roles. |
 | `engines.claudey.models.small` | `claude-sonnet-5` | Base small tier → `classify` role (asset classification + Design Brief). |
+| `engines.claudey.effort` | `medium` | Base reasoning effort (claudey's `--effort`) for every role. |
 | `engines.codey.bin` | `codey` | Binary for the codey engine. |
-| `engines.codey.models.best` | `gpt-5.5` | Base best tier → `code` + `reason` + `audit`. |
-| `engines.codey.models.small` | `gpt-5.4-mini` | Base small tier → `classify`. |
+| `engines.codey.models.best` | `gpt-5.6-sol` | Base best tier → `code` + `reason` + `audit`. |
+| `engines.codey.models.small` | `gpt-5.6-terra` | Base small tier → `classify`. |
+| `engines.codey.effort` | `medium` | Base reasoning effort (codey's `model_reasoning_effort`) for every role. |
 | `engines.opencode.bin` | `opencode` | Binary for the opencode engine. |
 | `engines.opencode.models.best` | `openrouter/google/gemini-3.1-pro-preview` | Base best tier (vision) → `audit`. |
 | `engines.opencode.models.small` | `openrouter/google/gemini-3-flash-preview` | Base small tier (vision) → `classify`. |
 | `engines.opencode.modelRoles.code` | `openrouter/z-ai/glm-5.2` | `generate` build — cheap text coder (overrides best tier). |
 | `engines.opencode.modelRoles.reason` | `openrouter/deepseek/deepseek-v4-pro` | `synthesize` — cheap text (overrides best tier). |
+| `engines.opencode.effort` | `medium` | Base reasoning effort (opencode's `--variant`) for every role. |
 | `wranglerBin` | `wrangler` | Cloudflare deploy, and Cloudflare teardown for `sb remove`. |
 | `ghBin` | `gh` | For `--github` / `sb push`, and GitHub teardown for `sb remove`. |
 | `pexelsApiKey` | *(unset)* | Enables tier-2 stock imagery. |
@@ -390,6 +397,16 @@ synthesis), and `audit` (smart vision — the review). Each role resolves to a p
 just use the two tiers; opencode keeps vision models on the base tiers and overrides the
 text roles (`code`, `reason`) with cheaper text-only models over OpenRouter. Any role is
 settable per engine, e.g. `sb config set engines.opencode.modelRoles.audit <model>`.
+
+Reasoning effort follows the same shape: each engine has a base `effort` (default
+`medium`) plus optional per-role `effortRoles.<role>` overrides, e.g.
+`sb config set engines.claudey.effortRoles.audit high`. Each engine CLI defines its
+own accepted effort values (claudey's `--effort`, codey's `model_reasoning_effort`,
+opencode's `--variant`), so this isn't validated against a shared enum.
+
+If a config value ever falls out of sync with the code (e.g. after an upgrade renames
+a model id), run `sb config fix` to repair invalid/missing keys against the current
+defaults without touching the rest of the file.
 
 ---
 

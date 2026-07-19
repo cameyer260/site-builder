@@ -96,8 +96,9 @@ const claudeyAdapter: EngineAdapter = {
     if (opts.dangerouslySkipPermissions) {
       args.push("--dangerously-skip-permissions");
     }
-    // Locked effort level (ADR-0010).
-    args.push("--effort", "medium");
+    // Reasoning effort — user-configurable (config `engines.claudey.effort`),
+    // defaults to "medium" (ADR-0010).
+    args.push("--effort", opts.effort ?? "medium");
     return { args, stdin: opts.prompt };
   },
 
@@ -185,7 +186,8 @@ const codeyAdapter: EngineAdapter = {
       args.push("--model", opts.model);
     }
     // Codex uses a config key/value pair for effort (--effort is not a valid flag — R0).
-    args.push("-c", "model_reasoning_effort=medium");
+    // User-configurable via config `engines.codey.effort`; defaults to "medium".
+    args.push("-c", `model_reasoning_effort=${opts.effort ?? "medium"}`);
     args.push("--json");
     // Always skip the git-repo check — synthesize runs in a non-git Client dir (R6).
     args.push("--skip-git-repo-check");
@@ -277,7 +279,8 @@ function codeyResultText(events: StreamEvent[]): string | null {
 const opencodeAdapter: EngineAdapter = {
   buildInvocation(opts) {
     const args: string[] = ["run"];
-    args.push("--variant", "medium");
+    // User-configurable via config `engines.opencode.effort`; defaults to "medium".
+    args.push("--variant", opts.effort ?? "medium");
     args.push("--format", "json");
     // Always skip permission prompts (R1 — opencode's headless bypass flag).
     args.push("--dangerously-skip-permissions");
