@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
 import type { IngestManifest } from "../src/ingest/manifest.ts";
 import { newClient } from "../src/storage/client.ts";
 import { clientPaths } from "../src/storage/layout.ts";
 import {
+  type AssetCandidate,
   type AssetClassification,
   candidateAssets,
+  canonicalStem,
+  dedupeCandidates,
+  looksLikeDerivativeSuffix,
   parseClassification,
   reconcileAssets,
 } from "../src/synthesize/assets.ts";
@@ -32,6 +36,11 @@ const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
   "base64",
 );
+// Same image, padded past dedupeCandidates' MIN_RASTER_BYTES floor — anything
+// that flows through runSynthesize's classification path (which now dedupes
+// first) needs to clear that floor to reach classification at all; direct
+// reconcileAssets tests bypass dedupeCandidates and can keep using bare PNG.
+const LARGE_PNG = Buffer.concat([PNG, Buffer.alloc(2000)]);
 
 const log = createLogger({ quiet: true });
 const config = { ...DEFAULTS, root: "/unused" } as Config;
@@ -194,6 +203,218 @@ test("parseClassification rejects malformed payloads", () => {
   expect(parseClassification({ nope: true })).toBeNull();
 });
 
+// ---- Candidate de-duplication (ADR-0016, pure) -----------------------------
+
+test("canonicalStem strips each WordPress/retina derivative suffix", () => {
+  expect(canonicalStem("photo-150x150")).toBe("photo");
+  expect(canonicalStem("photo-768x512")).toBe("photo");
+  expect(canonicalStem("photo-scaled")).toBe("photo");
+  expect(canonicalStem("photo-rotated")).toBe("photo");
+  expect(canonicalStem("photo-e1234567890123")).toBe("photo"); // 13-digit edit timestamp
+  expect(canonicalStem("photo@2x")).toBe("photo");
+  expect(canonicalStem("photo-2x")).toBe("photo");
+  expect(canonicalStem("photo-scaled-300x300")).toBe("photo"); // strips repeatedly
+});
+
+test("canonicalStem does not strip the upload-counter suffix", () => {
+  // -1/-2/... marks a distinct upload whose name collided (WordPress, and our
+  // own uniqueName in src/util/names.ts) — collapsing it would merge unrelated images.
+  expect(canonicalStem("photo-1")).toBe("photo-1");
+  expect(canonicalStem("AdobeStock_383075787_30-1")).toBe("AdobeStock_383075787_30-1");
+});
+
+test("looksLikeDerivativeSuffix recognizes size/crop tokens, dimensions, and cache-bust hashes", () => {
+  expect(looksLikeDerivativeSuffix("thegem-gallery-fullwidth")).toBe(true);
+  expect(looksLikeDerivativeSuffix("768x512")).toBe(true);
+  expect(looksLikeDerivativeSuffix("qicxenrkktrdap0uc1o4yh8ufz5n32g7c3yc411p28")).toBe(true); // 40+ char hash
+  expect(looksLikeDerivativeSuffix("left")).toBe(false);
+  expect(looksLikeDerivativeSuffix("2")).toBe(false);
+  expect(looksLikeDerivativeSuffix("final")).toBe(false);
+  // All-letter slug, even 20+ chars long, is a content word, not a hash.
+  expect(looksLikeDerivativeSuffix("fullcolorreversedversion")).toBe(false);
+  // An NxN fragment embedded in a longer content tail is not a dimension
+  // token — only a tail that is ENTIRELY WxH counts (unanchored regex bug).
+  expect(looksLikeDerivativeSuffix("3x5-postcard")).toBe(false);
+});
+
+/**
+ * Mirrors dedupeCandidates' identity-grouping decision (canonicalStem +
+ * bare-original-prefix fold) directly, with no disk I/O and no byte sizes —
+ * the "same original?" call is a pure function of the two filenames.
+ */
+function sameIdentity(nameA: string, nameB: string): boolean {
+  const stem = (name: string): string => {
+    const ext = extname(name);
+    return ext ? name.slice(0, -ext.length) : name;
+  };
+  const canonA = canonicalStem(stem(nameA));
+  const canonB = canonicalStem(stem(nameB));
+  if (canonA === canonB) {
+    return true;
+  }
+  const [shorter, longer] = canonA.length <= canonB.length ? [canonA, canonB] : [canonB, canonA];
+  return (
+    longer.startsWith(`${shorter}-`) && looksLikeDerivativeSuffix(longer.slice(shorter.length + 1))
+  );
+}
+
+test("real WordPress derivative filenames collapse to their bare original", () => {
+  // Group A: TheGem theme crops, bare original present
+  expect(
+    sameIdentity(
+      "13238983_1691353297780257_7245029022018360837_n.jpg",
+      "13238983_1691353297780257_7245029022018360837_n-thegem-gallery-fullwidth.jpg",
+    ),
+  ).toBe(true);
+  expect(
+    sameIdentity(
+      "13238983_1691353297780257_7245029022018360837_n.jpg",
+      "13238983_1691353297780257_7245029022018360837_n-thegem-post-thumb-small.jpg",
+    ),
+  ).toBe(true);
+
+  // Group B: WP core resize sizes, bare original present
+  expect(sameIdentity("AdobeStock_899096827_35.jpeg", "AdobeStock_899096827_35-400x400.jpeg")).toBe(
+    true,
+  );
+  expect(sameIdentity("AdobeStock_899096827_35.jpeg", "AdobeStock_899096827_35-600x600.jpeg")).toBe(
+    true,
+  );
+  expect(sameIdentity("AdobeStock_899096827_35.jpeg", "AdobeStock_899096827_35-768x430.jpeg")).toBe(
+    true,
+  );
+
+  // Group C: favicon size variant
+  expect(sameIdentity("PPR-Favicon.png", "PPR-Favicon-150x150.png")).toBe(true);
+
+  // Group D: cache-bust hash suffix, bare original present
+  expect(
+    sameIdentity(
+      "Pioneer-Logo.webp",
+      "Pioneer-Logo-qicxenrkktrdap0uc1o4yh8ufz5n32g7c3yc411p28.webp",
+    ),
+  ).toBe(true);
+});
+
+test("content words and distinct uploads are NOT folded together", () => {
+  // "left" is a content word, not a derivative token — must stay separate.
+  expect(sameIdentity("hero.jpg", "hero-left.jpg")).toBe(false);
+  // The "-1" upload counter marks a distinct upload (the same convention our
+  // own uniqueName appends on a stem collision). After WxH-stripping, the
+  // canons differ (AdobeStock_383075787_30-1 vs AdobeStock_383075787_30), so
+  // this correctly stays separate rather than folding a different upload into
+  // the -600x600 original's group.
+  expect(
+    sameIdentity("AdobeStock_383075787_30-1-768x519.jpeg", "AdobeStock_383075787_30-600x600.jpeg"),
+  ).toBe(false);
+  // A distinct upload with an all-letter descriptive slug (24 chars, no digits)
+  // must NOT be folded into the bare original as if it were a cache-bust hash.
+  expect(sameIdentity("logo.png", "logo-fullcolorreversedversion.png")).toBe(false);
+  // A genuinely distinct image whose content tail happens to contain an NxN
+  // fragment (e.g. "3x5" as part of "3x5-postcard") must not be folded into
+  // the bare original as if "3x5-postcard" were a WxH dimension suffix.
+  expect(sameIdentity("banner.jpg", "banner-3x5-postcard.jpg")).toBe(false);
+  // Real cache-bust hashes mix letters and digits and must still fold.
+  expect(
+    sameIdentity(
+      "Pioneer-Logo.webp",
+      "Pioneer-Logo-qicxenrkktrdap0uc1o4yh8ufz5n32g7c3yc411p28.webp",
+    ),
+  ).toBe(true);
+});
+
+// ---- dedupeCandidates integration (fs) -------------------------------------
+
+test("dedupeCandidates collapses byte-identical files, keeps the largest per identity group, and drops undersized rasters", () => {
+  const ingest = join(root, "ingest");
+  mkdirSync(ingest, { recursive: true });
+
+  // Identity group "hero": the bare original outweighs its WP-sized derivative.
+  const heroPath = join(ingest, "hero.png");
+  const heroSmallPath = join(ingest, "hero-300x300.png");
+  writeFileSync(heroPath, Buffer.alloc(2000, 1));
+  writeFileSync(heroSmallPath, Buffer.alloc(1800, 2));
+
+  // Byte-identical pair under unrelated names -> hash dedup keeps the shorter name.
+  const identicalShort = join(ingest, "identical.png");
+  const identicalLong = join(ingest, "identical-longer-name.png");
+  const identicalBytes = Buffer.alloc(1600, 5);
+  writeFileSync(identicalShort, identicalBytes);
+  writeFileSync(identicalLong, identicalBytes);
+
+  // A tracking-pixel-sized raster, unrelated to any other identity.
+  const tinyPath = join(ingest, "tiny.png");
+  writeFileSync(tinyPath, PNG); // 69 bytes, well under MIN_RASTER_BYTES
+
+  // A candidate whose file is missing — kept untouched, never dropped for an IO error.
+  const missingPath = join(ingest, "missing.png");
+
+  const candidates: AssetCandidate[] = [
+    { absPath: heroPath },
+    { absPath: heroSmallPath },
+    { absPath: identicalShort },
+    { absPath: identicalLong },
+    { absPath: tinyPath },
+    { absPath: missingPath },
+  ];
+
+  const result = dedupeCandidates(candidates);
+  const paths = result.map((c) => c.absPath);
+
+  expect(paths).toContain(heroPath);
+  expect(paths).not.toContain(heroSmallPath); // smaller derivative of the same identity dropped
+  expect(paths).toContain(identicalShort);
+  expect(paths).not.toContain(identicalLong); // byte-identical, longer name dropped
+  expect(paths).not.toContain(tinyPath); // below the raster size floor
+  expect(paths).toContain(missingPath); // unreadable -> kept, not dropped
+  expect(result.length).toBe(3);
+});
+
+test("dedupeCandidates derives identity from the on-disk basename, not the source URL's query string", () => {
+  const ingest = join(root, "ingest");
+  mkdirSync(ingest, { recursive: true });
+
+  // Byte-DIFFERENT files so the collapse below is proven by filename-grouping,
+  // not by the byte-hash step. Their on-disk names are the bare original and a
+  // WP-sized derivative, but their `url`s carry cache-bust/resize query strings
+  // that would corrupt `basename(candidate.url)` into e.g. "photo.jpg?ver=6.1"
+  // pre-fix, defeating extname/stemOf/canonicalStem and keeping both.
+  const photoPath = join(ingest, "photo.jpg");
+  const photoSmallPath = join(ingest, "photo-150x150.jpg");
+  writeFileSync(photoPath, Buffer.concat([LARGE_PNG, Buffer.alloc(10, 9)]));
+  writeFileSync(photoSmallPath, Buffer.concat([LARGE_PNG, Buffer.alloc(10, 7)]));
+
+  const candidates: AssetCandidate[] = [
+    { absPath: photoPath, url: "https://x.com/photo.jpg?ver=6.1" },
+    { absPath: photoSmallPath, url: "https://x.com/photo-150x150.jpg?resize=768,512" },
+  ];
+
+  const result = dedupeCandidates(candidates);
+  const paths = result.map((c) => c.absPath);
+
+  expect(result.length).toBe(1);
+  expect(paths).toContain(photoPath);
+  expect(paths).not.toContain(photoSmallPath);
+});
+
+test("dedupeCandidates keeps a large image whose filename has a small -WxH token", () => {
+  const ingest = join(root, "ingest");
+  mkdirSync(ingest, { recursive: true });
+
+  // "8x10" parses as an 8x10 dimension token, but this is a genuine large
+  // content image (an 8x10 print) — the size floor must judge only by actual
+  // bytes on disk, never by a WxH token parsed from the filename.
+  const productPath = join(ingest, "product-8x10.png");
+  writeFileSync(productPath, LARGE_PNG);
+
+  const candidates: AssetCandidate[] = [{ absPath: productPath }];
+
+  const result = dedupeCandidates(candidates);
+
+  expect(result.length).toBe(1);
+  expect(result.map((c) => c.absPath)).toContain(productPath);
+});
+
 // ---- Asset reconciliation (fs) -------------------------------------------
 
 test("reconcileAssets copies kept captured assets and skips a fallback when a logo exists", () => {
@@ -339,7 +560,7 @@ test("runSynthesize classifies captured assets into the manifest (vision call)",
   const paths = clientPaths(root, "Acme Plumbing");
   const logoAbs = join(paths.ingest, "site/assets/logo.png");
   mkdirSync(join(paths.ingest, "site/assets"), { recursive: true });
-  writeFileSync(logoAbs, PNG);
+  writeFileSync(logoAbs, LARGE_PNG);
   const client = newClient("Acme Plumbing", { docs: [], images: [], notes: "n" });
 
   const manifest = emptyManifest({
@@ -354,7 +575,7 @@ test("runSynthesize classifies captured assets into the manifest (vision call)",
           localPath: "site/assets/logo.png",
           kind: "img",
           fromPage: "http://x",
-          bytes: PNG.length,
+          bytes: LARGE_PNG.length,
         },
       ],
     },
@@ -391,7 +612,7 @@ test("runSynthesize trusts a valid assets.json even when the classification call
   const paths = clientPaths(root, "Acme Plumbing");
   const logoAbs = join(paths.ingest, "site/assets/logo.png");
   mkdirSync(join(paths.ingest, "site/assets"), { recursive: true });
-  writeFileSync(logoAbs, PNG);
+  writeFileSync(logoAbs, LARGE_PNG);
   const client = newClient("Acme Plumbing", { docs: [], images: [], notes: "n" });
 
   const manifest = emptyManifest({
@@ -406,7 +627,7 @@ test("runSynthesize trusts a valid assets.json even when the classification call
           localPath: "site/assets/logo.png",
           kind: "img",
           fromPage: "http://x",
-          bytes: PNG.length,
+          bytes: LARGE_PNG.length,
         },
       ],
     },
@@ -437,7 +658,7 @@ test("runSynthesize keeps the tolerated classification-failure warning short and
   const paths = clientPaths(root, "Acme Plumbing");
   const logoAbs = join(paths.ingest, "site/assets/logo.png");
   mkdirSync(join(paths.ingest, "site/assets"), { recursive: true });
-  writeFileSync(logoAbs, PNG);
+  writeFileSync(logoAbs, LARGE_PNG);
   const client = newClient("Acme Plumbing", { docs: [], images: [], notes: "n" });
 
   const manifest = emptyManifest({
@@ -452,7 +673,7 @@ test("runSynthesize keeps the tolerated classification-failure warning short and
           localPath: "site/assets/logo.png",
           kind: "img",
           fromPage: "http://x",
-          bytes: PNG.length,
+          bytes: LARGE_PNG.length,
         },
       ],
     },

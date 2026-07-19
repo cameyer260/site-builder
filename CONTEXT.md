@@ -53,7 +53,7 @@ Creates the Client's folder, registers the Client, and sets up its state/records
 Gathers raw material into the Client folder from every provided input source. If a URL is given, crawls the existing website (HTML→Markdown, native-resolution screen-by-screen screenshots, asset download). Also collects any provided documents (PDF, Word, txt, Markdown) and images. The website is one input source among several, never individually required — only one input overall is. Pure code, no AI.
 
 **`synthesize`**:
-Turns raw ingested material into structured context the next stage can build from: classifies and renames downloaded image Assets, reconciles them against required assets (using Fallback Assets where missing), and produces the structured context files plus a "what we still need to know" checklist. Code plus AI.
+Turns raw ingested material into structured context the next stage can build from: de-duplicates downloaded image Assets (near-identical WordPress size/crop derivatives collapsed to one representative) before classifying and renaming them, reconciles them against required assets (using Fallback Assets where missing), and produces the structured context files plus a "what we still need to know" checklist. Code plus AI.
 _Avoid_: context build, analyze
 
 **`generate`**:
