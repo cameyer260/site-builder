@@ -358,6 +358,33 @@ test("dedupeCandidates collapses byte-identical files, keeps the largest per ide
   expect(result.length).toBe(3);
 });
 
+test("dedupeCandidates derives identity from the on-disk basename, not the source URL's query string", () => {
+  const ingest = join(root, "ingest");
+  mkdirSync(ingest, { recursive: true });
+
+  // Byte-DIFFERENT files so the collapse below is proven by filename-grouping,
+  // not by the byte-hash step. Their on-disk names are the bare original and a
+  // WP-sized derivative, but their `url`s carry cache-bust/resize query strings
+  // that would corrupt `basename(candidate.url)` into e.g. "photo.jpg?ver=6.1"
+  // pre-fix, defeating extname/stemOf/canonicalStem and keeping both.
+  const photoPath = join(ingest, "photo.jpg");
+  const photoSmallPath = join(ingest, "photo-150x150.jpg");
+  writeFileSync(photoPath, Buffer.concat([LARGE_PNG, Buffer.alloc(10, 9)]));
+  writeFileSync(photoSmallPath, Buffer.concat([LARGE_PNG, Buffer.alloc(10, 7)]));
+
+  const candidates: AssetCandidate[] = [
+    { absPath: photoPath, url: "https://x.com/photo.jpg?ver=6.1" },
+    { absPath: photoSmallPath, url: "https://x.com/photo-150x150.jpg?resize=768,512" },
+  ];
+
+  const result = dedupeCandidates(candidates);
+  const paths = result.map((c) => c.absPath);
+
+  expect(result.length).toBe(1);
+  expect(paths).toContain(photoPath);
+  expect(paths).not.toContain(photoSmallPath);
+});
+
 // ---- Asset reconciliation (fs) -------------------------------------------
 
 test("reconcileAssets copies kept captured assets and skips a fallback when a logo exists", () => {
