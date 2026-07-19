@@ -14,7 +14,6 @@ import {
   dedupeCandidates,
   looksLikeDerivativeSuffix,
   parseClassification,
-  parseSizeSuffix,
   reconcileAssets,
 } from "../src/synthesize/assets.ts";
 import { CHECKLIST, renderChecklistForPrompt } from "../src/synthesize/checklist.ts";
@@ -224,12 +223,6 @@ test("canonicalStem does not strip the upload-counter suffix", () => {
   expect(canonicalStem("AdobeStock_383075787_30-1")).toBe("AdobeStock_383075787_30-1");
 });
 
-test("parseSizeSuffix extracts trailing WxH dimensions", () => {
-  expect(parseSizeSuffix("photo-150x150")).toEqual({ w: 150, h: 150 });
-  expect(parseSizeSuffix("photo-1-768x519")).toEqual({ w: 768, h: 519 });
-  expect(parseSizeSuffix("photo")).toBeNull();
-});
-
 test("looksLikeDerivativeSuffix recognizes size/crop tokens, dimensions, and cache-bust hashes", () => {
   expect(looksLikeDerivativeSuffix("thegem-gallery-fullwidth")).toBe(true);
   expect(looksLikeDerivativeSuffix("768x512")).toBe(true);
@@ -383,6 +376,24 @@ test("dedupeCandidates derives identity from the on-disk basename, not the sourc
   expect(result.length).toBe(1);
   expect(paths).toContain(photoPath);
   expect(paths).not.toContain(photoSmallPath);
+});
+
+test("dedupeCandidates keeps a large image whose filename has a small -WxH token", () => {
+  const ingest = join(root, "ingest");
+  mkdirSync(ingest, { recursive: true });
+
+  // "8x10" parses as an 8x10 dimension token, but this is a genuine large
+  // content image (an 8x10 print) — the size floor must judge only by actual
+  // bytes on disk, never by a WxH token parsed from the filename.
+  const productPath = join(ingest, "product-8x10.png");
+  writeFileSync(productPath, LARGE_PNG);
+
+  const candidates: AssetCandidate[] = [{ absPath: productPath }];
+
+  const result = dedupeCandidates(candidates);
+
+  expect(result.length).toBe(1);
+  expect(result.map((c) => c.absPath)).toContain(productPath);
 });
 
 // ---- Asset reconciliation (fs) -------------------------------------------

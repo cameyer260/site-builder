@@ -192,21 +192,10 @@ export function looksLikeDerivativeSuffix(rest: string): boolean {
   return rest.split("-").some((token) => DERIVATIVE_TOKENS.has(token.toLowerCase()));
 }
 
-/** The trailing `-WxH` dimensions off a bare filename stem (no extension), or null. */
-export function parseSizeSuffix(base: string): { w: number; h: number } | null {
-  const match = base.match(/-(\d{1,5})x(\d{1,5})$/);
-  if (!match) {
-    return null;
-  }
-  return { w: Number(match[1]), h: Number(match[2]) };
-}
-
 /** Raster extensions eligible for the size floor; SVG/ICO are exempt as legitimately-tiny vectors/icons. */
 const RASTER_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
 /** Below this byte count, a raster image is a tracking pixel/spacer, not real content. */
 const MIN_RASTER_BYTES = 1500;
-/** Below this pixel size (on the larger side), a parsed WxH derivative is too small to be useful. */
-const MIN_DIMENSION = 32;
 
 interface EnrichedCandidate {
   candidate: AssetCandidate;
@@ -241,8 +230,8 @@ function cleanBasename(pathOrUrl: string): string {
  *    original's bare stem, and a conservative bare-original prefix rule folds
  *    `{stem}-{suffix}` into a captured bare `{stem}` Candidate when the suffix
  *    reads as a derivative token. Keeps the largest-byte survivor per group.
- * 3. Size floor — drops tracking-pixel-sized rasters and undersized `-WxH`
- *    derivatives.
+ * 3. Size floor — drops tracking-pixel/spacer-sized rasters by actual bytes
+ *    on disk. Never inferred from the filename.
  *
  * A Candidate that can't be read off disk is kept untouched and excluded from
  * every grouping/floor step above — never dropped for an IO error.
@@ -329,14 +318,12 @@ export function dedupeCandidates(candidates: AssetCandidate[]): AssetCandidate[]
     );
   }
 
-  // 3. Size floor.
+  // 3. Size floor: drop tracking-pixel/spacer-sized rasters by actual bytes on
+  //    disk (SVG/ICO exempt as legitimately-tiny vectors/icons). Never infer
+  //    size from the filename — a small -WxH token can name a large real image.
   for (const item of identitySurvivors) {
     const ext = extname(item.name).toLowerCase();
     if (RASTER_EXTENSIONS.has(ext) && item.bytes < MIN_RASTER_BYTES) {
-      continue;
-    }
-    const size = parseSizeSuffix(stemOf(item.name));
-    if (size && Math.max(size.w, size.h) < MIN_DIMENSION) {
       continue;
     }
     keep.add(item.candidate);
