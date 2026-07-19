@@ -220,6 +220,11 @@ function stemOf(name: string): string {
   return ext ? name.slice(0, -ext.length) : name;
 }
 
+/** Basename of a path/URL with any `?query`/`#fragment` stripped. */
+function cleanBasename(pathOrUrl: string): string {
+  return basename(pathOrUrl).replace(/[?#].*$/, "");
+}
+
 /**
  * Deterministic, dependency-free de-duplication of image Asset Candidates,
  * run before the vision-classification engine call (ADR-0016). Client sites —
@@ -247,7 +252,7 @@ export function dedupeCandidates(candidates: AssetCandidate[]): AssetCandidate[]
   const enriched: EnrichedCandidate[] = [];
 
   for (const candidate of candidates) {
-    const name = basename(candidate.url ?? candidate.absPath);
+    const name = cleanBasename(candidate.absPath);
     try {
       const bytes = readFileSync(candidate.absPath);
       enriched.push({
