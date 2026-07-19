@@ -6,16 +6,15 @@
  * intelligence comes from the `ui-ux-pro-max` skill (ADR-0006), not the prompt.
  */
 
-/** Thin orchestration directives appended to the system prompt for the audit call. */
+/**
+ * Thin orchestration directive appended to the system prompt for the audit call.
+ * Everything else (review scope, the one-fix-pass rule, the Kit floor, the no-build
+ * constraint) is already covered by `buildAuditPrompt` itself — kept here only as a
+ * fallback framing plus the one directive the user prompt never states.
+ */
 export const AUDIT_SYSTEM_PROMPT = [
   "You are the `audit` stage of the Site Builder pipeline.",
-  "Review the already-built Site, then apply ONE fix pass in the same run.",
-  "Preserve the Kit's quality floor (semantic landmarks, SEO/meta, focus states,",
-  "reduced-motion rules); do not regress it while fixing.",
   "Use the `ui-ux-pro-max` skill for visual/accessibility judgment.",
-  "Do NOT run npm, astro build, or astro dev — the pipeline runs the compile gate.",
-  "Communicate only by writing audit/audit.md and editing the Site files; do not",
-  "print explanations.",
 ].join(" ");
 
 export interface AuditPromptInput {
