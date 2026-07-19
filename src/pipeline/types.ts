@@ -41,6 +41,12 @@ export interface RunContext {
    * overrides (ADR-0013, revising ADR-0010). See `engine/tiers.ts`.
    */
   modelFor: (stage: string) => string;
+  /**
+   * Returns the reasoning-effort value for a given stage name, resolved via
+   * the active engine's base `effort` + per-role `effortRoles` overrides.
+   * See `engine/tiers.ts`.
+   */
+  effortFor: (stage: string) => string;
 
   /**
    * Engine runner for the AI stages. Left unset in production (stages default

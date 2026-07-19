@@ -44,6 +44,22 @@ export const EngineProfileSchema = z.object({
       audit: z.string().min(1).optional(),
     })
     .default({}),
+  /**
+   * Base reasoning-effort level sent on every call to this Engine (claudey's
+   * `--effort`, codey's `model_reasoning_effort`, opencode's `--variant`).
+   * Each Engine CLI defines its own accepted values, so this is a free string
+   * rather than a shared enum. Defaults to `"medium"`.
+   */
+  effort: z.string().min(1).default("medium"),
+  /** Per-role effort overrides, mirroring `modelRoles`; falls back to `effort`. */
+  effortRoles: z
+    .object({
+      classify: z.string().min(1).optional(),
+      code: z.string().min(1).optional(),
+      reason: z.string().min(1).optional(),
+      audit: z.string().min(1).optional(),
+    })
+    .default({}),
 });
 export type EngineProfile = z.infer<typeof EngineProfileSchema>;
 
@@ -58,11 +74,15 @@ const ENGINE_DEFAULTS: Record<EngineKind, EngineProfile> = {
     bin: "claudey",
     models: { best: "claude-opus-4-8", small: "claude-sonnet-5" },
     modelRoles: {},
+    effort: "medium",
+    effortRoles: {},
   },
   codey: {
     bin: "codey",
     models: { best: "gpt-5.6-sol", small: "gpt-5.6-terra" },
     modelRoles: {},
+    effort: "medium",
+    effortRoles: {},
   },
   opencode: {
     bin: "opencode",
@@ -77,6 +97,8 @@ const ENGINE_DEFAULTS: Record<EngineKind, EngineProfile> = {
       code: "openrouter/z-ai/glm-5.2",
       reason: "openrouter/deepseek/deepseek-v4-pro",
     },
+    effort: "medium",
+    effortRoles: {},
   },
 };
 

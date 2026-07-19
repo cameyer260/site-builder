@@ -60,3 +60,16 @@ export function resolveModel(profile: EngineProfile, stage: string): string {
   }
   return profile.modelRoles[role] ?? profile.models[ROLE_TIER[role]];
 }
+
+/**
+ * Resolves the reasoning-effort value for a stage: a per-role override
+ * (`effortRoles`) when the engine sets one, else the engine's base `effort`.
+ * Mirrors `resolveModel`'s override-else-fallback shape.
+ */
+export function resolveEffort(profile: EngineProfile, stage: string): string {
+  const role = STAGE_ROLE[stage];
+  if (role === undefined) {
+    return profile.effort;
+  }
+  return profile.effortRoles[role] ?? profile.effort;
+}

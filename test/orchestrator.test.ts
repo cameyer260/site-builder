@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Config, DEFAULTS } from "../src/config/schema.ts";
 import type { EngineRunner } from "../src/engine/runner.ts";
-import { resolveModel } from "../src/engine/tiers.ts";
+import { resolveEffort, resolveModel } from "../src/engine/tiers.ts";
 import { findResumeStage, resumePipeline, runBuild } from "../src/pipeline/orchestrator.ts";
 import type { RunContext } from "../src/pipeline/types.ts";
 import { type ClientInputs, ClientInputsSchema, readClient } from "../src/storage/client.ts";
@@ -42,6 +42,7 @@ function makeCtx(
     engineKind,
     engineBin: engineProfile.bin,
     modelFor: (stage) => resolveModel(engineProfile, stage),
+    effortFor: (stage) => resolveEffort(engineProfile, stage),
     log: createLogger({ quiet: true }),
     failAt: opts.failAt,
     inputs: opts.withInputs === false ? undefined : INPUTS,
