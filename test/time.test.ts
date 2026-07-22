@@ -7,7 +7,9 @@ test("formatUserDateTime renders a local date/time string without raw UTC syntax
     timeZone: "America/New_York",
   });
 
-  expect(formatted).toBe("Jan 1, 2026, 10:04 PM");
+  // Separator between date and time ("," vs " at ") varies by ICU/CLDR version
+  // bundled with the JS runtime, so match loosely instead of the exact string.
+  expect(formatted).toMatch(/^Jan 1, 2026.*10:04\s?PM$/);
   expect(formatted).not.toContain("T03:04:00.000Z");
 });
 
