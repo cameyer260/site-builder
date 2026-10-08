@@ -30,7 +30,9 @@ CLI — the **Engine** (`claudey` by default, or `codey`/`opencode` via `--engin
   is the inverse of create — external teardown first, then gapless Site Version
   compaction), 0015 (the Kit ships primitives + near-empty page skeletons, not
   a finished template; the per-Client look is composed at build time from the
-  Design Brief the Engine derives from the Client Profile).
+  Design Brief the Engine derives from the Client Profile), 0016 (asset
+  candidates are deterministically de-duplicated — byte-hash, WordPress
+  derivative grouping, size floor — before the classification engine call).
 - **`docs/roadmap.md`** — what is *explicitly out of scope for v1*; don't build these
   without being asked.
 
@@ -97,7 +99,12 @@ never rejects; every in-flight call also registers with `killActiveEngines`, whi
 orphan a still-running engine (ADR-0014). A best-effort AI call (e.g. asset
 classification) should re-gate on the artifact it wrote, not the engine's own `ok`
 verdict — ADR-0014, after a real engine bug reported `ok: false` for a call that had
-actually succeeded. Models are chosen by **capability role** (ADR-0013): each call maps to
+actually succeeded. Before that call runs, `synthesize`'s asset candidates are
+deterministically de-duplicated — exact byte-hash matches, WordPress size/crop
+derivative grouping, a size floor for tracking pixels (`dedupeCandidates`,
+`src/synthesize/assets.ts`, ADR-0016) — so the vision classification call isn't
+paying cost/turns to notice redundant candidates itself. Models are chosen by
+**capability role** (ADR-0013): each call maps to
 one of `classify` (cheap vision — asset classification + Design Brief), `code` (text —
 the Site build), `reason` (smart text — profile synthesis), or `audit` (smart vision —
 the review). A fixed stage→role table in code (`engine/tiers.ts`) resolves against each

@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { IngestManifest } from "../ingest/manifest.ts";
@@ -100,6 +101,236 @@ export function candidateAssets(manifest: IngestManifest, ingestDir: string): As
     add(image.localPath);
   }
   return candidates;
+}
+
+// ---- Candidate de-duplication (ADR-0016) -----------------------------------
+//
+// The crawler records one URL per <img>, so the same original image served at
+// many registered WordPress sizes / theme crops across pages becomes many
+// distinct Candidates. `dedupeCandidates` collapses each original down to a
+// single best representative before classification ever sees the list — see
+// ADR-0016 for the full rationale and the production numbers that motivated it.
+
+/** WordPress/retina derivative suffixes `canonicalStem` strips, anchored at the end. */
+const DERIVATIVE_SUFFIXES: readonly RegExp[] = [
+  /-\d{1,5}x\d{1,5}$/, // WP core resize, e.g. -150x150, -768x512
+  /-scaled$/, // WP big-image auto-scale
+  /-rotated$/, // WP auto-rotate
+  /-e\d{13}$/, // WP media-editor edit, -e{13-digit timestamp}
+  /@2x$/, // retina
+  /-2x$/, // retina
+];
+
+/**
+ * Strips WordPress/retina derivative suffixes off a bare filename stem
+ * (no extension), repeatedly, until none apply. Deliberately does NOT strip a
+ * trailing upload counter (`-1`, `-2`, …): in WordPress that marks a genuinely
+ * distinct upload whose name collided, and our own downloader (`uniqueName`,
+ * `src/util/names.ts`) appends the same suffix on our own stem collisions —
+ * stripping it would wrongly fold different images together.
+ */
+export function canonicalStem(base: string): string {
+  let stem = base;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const suffix of DERIVATIVE_SUFFIXES) {
+      const stripped = stem.replace(suffix, "");
+      if (stripped !== stem) {
+        stem = stripped;
+        changed = true;
+      }
+    }
+  }
+  return stem;
+}
+
+/** Size/crop vocabulary a derivative suffix tail may consist of (case-insensitive). */
+const DERIVATIVE_TOKENS = new Set([
+  "thumb",
+  "thumbnail",
+  "small",
+  "medium",
+  "large",
+  "full",
+  "fullwidth",
+  "wide",
+  "tall",
+  "square",
+  "portrait",
+  "landscape",
+  "gallery",
+  "crop",
+  "cropped",
+  "grid",
+  "masonry",
+  "scaled",
+  "rotated",
+  "retina",
+  "mobile",
+  "desktop",
+  "preview",
+  "thegem",
+]);
+
+/** Matches only when the entire tail is a WxH dimension (e.g. `768x512`), not an embedded NxN fragment inside a longer content word. */
+const DIMENSION_TOKEN = /^\d+x\d+$/i;
+/** An opaque cache-bust / image-optimization hash appended to a filename (mixed letters+digits). */
+const OPAQUE_HASH_TOKEN = /^(?=.*[a-z])(?=.*\d)[a-z0-9]{20,}$/i;
+
+/**
+ * True when `rest` — the hyphen-delimited tail after a bare original's
+ * stem — reads as a derivative marker rather than a distinct content word:
+ * a WxH dimension token, an opaque cache-bust hash, or (when split on `-`) any
+ * token drawn from the size/crop vocab. Deliberately conservative: a content
+ * word like `left` must NOT match, so `hero-left.jpg` never folds into
+ * `hero.jpg` just because it shares a prefix.
+ */
+export function looksLikeDerivativeSuffix(rest: string): boolean {
+  if (DIMENSION_TOKEN.test(rest) || OPAQUE_HASH_TOKEN.test(rest)) {
+    return true;
+  }
+  return rest.split("-").some((token) => DERIVATIVE_TOKENS.has(token.toLowerCase()));
+}
+
+/** Raster extensions eligible for the size floor; SVG/ICO are exempt as legitimately-tiny vectors/icons. */
+const RASTER_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+/** Below this byte count, a raster image is a tracking pixel/spacer, not real content. */
+const MIN_RASTER_BYTES = 1500;
+
+interface EnrichedCandidate {
+  candidate: AssetCandidate;
+  name: string;
+  bytes: number;
+  hash: string;
+}
+
+function stemOf(name: string): string {
+  const ext = extname(name);
+  return ext ? name.slice(0, -ext.length) : name;
+}
+
+/** Basename of a path/URL with any `?query`/`#fragment` stripped. */
+function cleanBasename(pathOrUrl: string): string {
+  return basename(pathOrUrl).replace(/[?#].*$/, "");
+}
+
+/**
+ * Deterministic, dependency-free de-duplication of image Asset Candidates,
+ * run before the vision-classification engine call (ADR-0016). Client sites —
+ * especially WordPress — serve the same original image at many registered
+ * sizes / theme crops across pages, so a 25-page site can produce 100+
+ * Candidates that are mostly derivatives of a few dozen originals; handing all
+ * of them to classification inflates that call's cost and reliability for no
+ * benefit, since the derivatives carry no information the original lacks.
+ * Reading each Candidate's bytes off disk is the only impure step.
+ *
+ * In order:
+ * 1. Exact byte-hash dedup (sha1) — catches identical bytes under any name.
+ * 2. WordPress-derivative identity grouping — `canonicalStem` recovers each
+ *    original's bare stem, and a conservative bare-original prefix rule folds
+ *    `{stem}-{suffix}` into a captured bare `{stem}` Candidate when the suffix
+ *    reads as a derivative token. Keeps the largest-byte survivor per group.
+ * 3. Size floor — drops tracking-pixel/spacer-sized rasters by actual bytes
+ *    on disk. Never inferred from the filename.
+ *
+ * A Candidate that can't be read off disk is kept untouched and excluded from
+ * every grouping/floor step above — never dropped for an IO error.
+ */
+export function dedupeCandidates(candidates: AssetCandidate[]): AssetCandidate[] {
+  const keep = new Set<AssetCandidate>();
+  const enriched: EnrichedCandidate[] = [];
+
+  for (const candidate of candidates) {
+    const name = cleanBasename(candidate.absPath);
+    try {
+      const bytes = readFileSync(candidate.absPath);
+      enriched.push({
+        candidate,
+        name,
+        bytes: bytes.length,
+        hash: createHash("sha1").update(bytes).digest("hex"),
+      });
+    } catch {
+      keep.add(candidate); // unreadable: keep as its own singleton, never drop
+    }
+  }
+
+  // 1. Exact byte-hash dedup: within a hash group, keep the shortest name.
+  const byHash = new Map<string, EnrichedCandidate>();
+  for (const item of enriched) {
+    const existing = byHash.get(item.hash);
+    if (!existing || item.name.length < existing.name.length) {
+      byHash.set(item.hash, item);
+    }
+  }
+  const hashSurvivors = [...byHash.values()];
+
+  // 2. Identity grouping: primary key is canonicalStem; a union step then folds
+  // a derivative's canon into its bare original's canon when the tail reads as
+  // a derivative suffix (tiny union-find over the small set of distinct canons).
+  const canonOf = new Map<EnrichedCandidate, string>();
+  for (const item of hashSurvivors) {
+    canonOf.set(item, canonicalStem(stemOf(item.name)));
+  }
+  const distinctCanons = [...new Set(canonOf.values())];
+
+  const parent = new Map<string, string>(distinctCanons.map((c) => [c, c]));
+  const find = (s: string): string => {
+    let root = s;
+    while (parent.get(root) !== root) {
+      root = parent.get(root) as string;
+    }
+    parent.set(s, root);
+    return root;
+  };
+  for (const cA of distinctCanons) {
+    for (const cB of distinctCanons) {
+      if (
+        cA !== cB &&
+        cB.startsWith(`${cA}-`) &&
+        looksLikeDerivativeSuffix(cB.slice(cA.length + 1))
+      ) {
+        parent.set(find(cB), find(cA));
+      }
+    }
+  }
+
+  const groups = new Map<string, EnrichedCandidate[]>();
+  for (const item of hashSurvivors) {
+    const root = find(canonOf.get(item) as string);
+    const group = groups.get(root);
+    if (group) {
+      group.push(item);
+    } else {
+      groups.set(root, [item]);
+    }
+  }
+
+  const identitySurvivors: EnrichedCandidate[] = [];
+  for (const group of groups.values()) {
+    identitySurvivors.push(
+      group.reduce((best, item) =>
+        item.bytes > best.bytes ||
+        (item.bytes === best.bytes && item.name.length < best.name.length)
+          ? item
+          : best,
+      ),
+    );
+  }
+
+  // 3. Size floor: drop tracking-pixel/spacer-sized rasters by actual bytes on
+  //    disk (SVG/ICO exempt as legitimately-tiny vectors/icons). Never infer
+  //    size from the filename — a small -WxH token can name a large real image.
+  for (const item of identitySurvivors) {
+    const ext = extname(item.name).toLowerCase();
+    if (RASTER_EXTENSIONS.has(ext) && item.bytes < MIN_RASTER_BYTES) {
+      continue;
+    }
+    keep.add(item.candidate);
+  }
+
+  return candidates.filter((c) => keep.has(c));
 }
 
 /** Validates a parsed `context/assets.json` payload; null when it doesn't conform. */
